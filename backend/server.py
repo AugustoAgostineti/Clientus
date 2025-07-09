@@ -749,6 +749,151 @@ async def update_material(material_id: str, material_data: MaterialUpdate, curre
     material_response.client_name = client["name"] if client else "Unknown Client"
     return material_response
 
+@api_router.delete("/admin/materials/{material_id}")
+async def delete_material(material_id: str, current_admin: AdminUser = Depends(get_current_admin)):
+    material = await db.materials.find_one({"id": material_id})
+    if not material:
+        raise HTTPException(status_code=404, detail="Material not found")
+    
+    await db.materials.delete_one({"id": material_id})
+    return {"message": "Material deleted successfully"}
+
+@api_router.get("/admin/materials/filters")
+async def get_material_filters(current_admin: AdminUser = Depends(get_current_admin)):
+    # Get filter options
+    clients_pipeline = [
+        {"$group": {"_id": "$client_id", "count": {"$sum": 1}}},
+        {"$lookup": {"from": "clients", "localField": "_id", "foreignField": "id", "as": "client"}},
+        {"$unwind": "$client"},
+        {"$project": {"client_id": "$_id", "count": 1, "name": "$client.name"}}
+    ]
+    
+    status_pipeline = [
+        {"$group": {"_id": "$status", "count": {"$sum": 1}}}
+    ]
+    
+    type_pipeline = [
+        {"$group": {"_id": "$type", "count": {"$sum": 1}}}
+    ]
+    
+    clients_agg = await db.materials.aggregate(clients_pipeline).to_list(1000)
+    status_agg = await db.materials.aggregate(status_pipeline).to_list(1000)
+    type_agg = await db.materials.aggregate(type_pipeline).to_list(1000)
+    
+    return {
+        "clients": clients_agg,
+        "statuses": status_agg,
+        "types": type_agg
+    }
+
+@api_router.get("/admin/materials/tags/autocomplete")
+async def get_material_tags(q: str = "", current_admin: AdminUser = Depends(get_current_admin)):
+    # Get unique tags that match the query
+    pipeline = [
+        {"$unwind": "$tags"},
+        {"$match": {"tags": {"$regex": q, "$options": "i"}}},
+        {"$group": {"_id": "$tags", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 10}
+    ]
+    
+    tags_agg = await db.materials.aggregate(pipeline).to_list(10)
+    return [{"tag": tag["_id"], "count": tag["count"]} for tag in tags_agg]
+
+@api_router.post("/admin/materials/bulk-actions")
+async def bulk_material_actions(
+    action: str,
+    material_ids: List[str],
+    new_status: Optional[str] = None,
+    current_admin: AdminUser = Depends(get_current_admin)
+):
+    if action == "delete":
+        result = await db.materials.delete_many({"id": {"$in": material_ids}})
+        return {"message": f"Deleted {result.deleted_count} materials"}
+    
+    elif action == "update_status" and new_status:
+        result = await db.materials.update_many(
+            {"id": {"$in": material_ids}},
+            {"$set": {"status": new_status}}
+        )
+        return {"message": f"Updated {result.modified_count} materials to {new_status}"}
+    
+    elif action == "approve":
+        approval_entry = ApprovalHistory(action="approved")
+        result = await db.materials.update_many(
+            {"id": {"$in": material_ids}},
+            {
+                "$set": {"status": "approved"},
+                "$push": {"approval_history": approval_entry.dict()}
+            }
+        )
+        return {"message": f"Approved {result.modified_count} materials"}
+    
+    else:
+        raise HTTPException(status_code=400, detail="Invalid action")
+
+@api_router.get("/admin/materials/search")
+async def search_materials(
+    client_id: Optional[str] = None,
+    status: Optional[str] = None,
+    type: Optional[str] = None,
+    search: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    page: int = 1,
+    limit: int = 20,
+    current_admin: AdminUser = Depends(get_current_admin)
+):
+    # Build query
+    query = {}
+    
+    if client_id and client_id != "all":
+        query["client_id"] = client_id
+    
+    if status and status != "all":
+        query["status"] = status
+    
+    if type and type != "all":
+        query["type"] = type
+    
+    if search:
+        query["$or"] = [
+            {"title": {"$regex": search, "$options": "i"}},
+            {"description": {"$regex": search, "$options": "i"}},
+            {"tags": {"$in": [search]}}
+        ]
+    
+    if date_from or date_to:
+        date_query = {}
+        if date_from:
+            date_query["$gte"] = datetime.fromisoformat(date_from)
+        if date_to:
+            date_query["$lte"] = datetime.fromisoformat(date_to)
+        query["scheduled_date"] = date_query
+    
+    # Get total count
+    total = await db.materials.count_documents(query)
+    
+    # Get paginated results
+    skip = (page - 1) * limit
+    materials = await db.materials.find(query).skip(skip).limit(limit).sort("created_at", -1).to_list(limit)
+    
+    # Add client names
+    material_responses = []
+    for material in materials:
+        client = await db.clients.find_one({"id": material["client_id"]})
+        material_response = MaterialResponse(**material)
+        material_response.client_name = client["name"] if client else "Unknown Client"
+        material_responses.append(material_response)
+    
+    return {
+        "materials": material_responses,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "total_pages": (total + limit - 1) // limit
+    }
+
 @api_router.get("/admin/campaigns", response_model=List[CampaignResponse])
 async def get_all_campaigns(current_admin: AdminUser = Depends(get_current_admin)):
     campaigns = await db.campaigns.find({}).to_list(1000)
