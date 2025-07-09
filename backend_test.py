@@ -10,6 +10,9 @@ class Take2StudioAPITester:
         self.tests_run = 0
         self.tests_passed = 0
         self.client_id = None
+        self.material_id = None
+        self.document_id = None
+        self.category_id = None
 
     def run_test(self, name, method, endpoint, expected_status, data=None, auth=True):
         """Run a single API test"""
@@ -106,9 +109,98 @@ class Take2StudioAPITester:
             if len(response) > 0:
                 print("Sample material:")
                 sample = response[0]
+                self.material_id = sample.get('id')
+                print(f"  ID: {self.material_id}")
                 print(f"  Title: {sample.get('title')}")
                 print(f"  Type: {sample.get('type')}")
                 print(f"  Status: {sample.get('status')}")
+        return success
+
+    def test_get_material_by_id(self):
+        """Test getting a specific material by ID"""
+        if not self.material_id:
+            print("❌ No material ID available for testing")
+            return False
+            
+        print("\n📦 Testing Get Material by ID")
+        success, response = self.run_test(
+            f"Get Material {self.material_id}",
+            "GET",
+            f"materials/{self.material_id}",
+            200
+        )
+        if success:
+            print(f"Retrieved material: {response.get('title')}")
+        return success
+
+    def test_get_material_comments(self):
+        """Test getting comments for a material"""
+        if not self.material_id:
+            print("❌ No material ID available for testing")
+            return False
+            
+        print("\n💬 Testing Get Material Comments")
+        success, response = self.run_test(
+            f"Get Comments for Material {self.material_id}",
+            "GET",
+            f"materials/{self.material_id}/comments",
+            200
+        )
+        if success:
+            print(f"Retrieved {len(response)} comments")
+        return success
+
+    def test_add_material_comment(self):
+        """Test adding a comment to a material"""
+        if not self.material_id:
+            print("❌ No material ID available for testing")
+            return False
+            
+        print("\n💬 Testing Add Material Comment")
+        success, response = self.run_test(
+            f"Add Comment to Material {self.material_id}",
+            "POST",
+            f"materials/{self.material_id}/comments",
+            200,
+            data={"text": f"Test comment added at {datetime.now().isoformat()}"}
+        )
+        if success:
+            print(f"Comment added: {response.get('text')}")
+        return success
+
+    def test_approve_material(self):
+        """Test approving a material"""
+        if not self.material_id:
+            print("❌ No material ID available for testing")
+            return False
+            
+        print("\n✅ Testing Approve Material")
+        success, response = self.run_test(
+            f"Approve Material {self.material_id}",
+            "POST",
+            f"materials/{self.material_id}/approve",
+            200
+        )
+        if success:
+            print(f"Material approved: {response.get('message')}")
+        return success
+
+    def test_request_revision(self):
+        """Test requesting revision for a material"""
+        if not self.material_id:
+            print("❌ No material ID available for testing")
+            return False
+            
+        print("\n🔄 Testing Request Revision")
+        success, response = self.run_test(
+            f"Request Revision for Material {self.material_id}",
+            "POST",
+            f"materials/{self.material_id}/request-revision",
+            200,
+            data={"text": f"Please revise this material - test at {datetime.now().isoformat()}"}
+        )
+        if success:
+            print(f"Revision requested: {response.get('message')}")
         return success
 
     def test_get_campaigns(self):
@@ -132,6 +224,68 @@ class Take2StudioAPITester:
                 print(f"  CTR: {sample.get('ctr')}%")
         return success
 
+    def test_get_document_categories(self):
+        """Test getting document categories"""
+        print("\n📁 Testing Get Document Categories")
+        success, response = self.run_test(
+            "Get Document Categories",
+            "GET",
+            "documents/categories",
+            200
+        )
+        if success:
+            print(f"Retrieved {len(response)} document categories")
+            if len(response) > 0:
+                print("Sample category:")
+                sample = response[0]
+                self.category_id = sample.get('id')
+                print(f"  ID: {self.category_id}")
+                print(f"  Name: {sample.get('name')}")
+                print(f"  Description: {sample.get('description')}")
+        return success
+
+    def test_get_documents_by_category(self):
+        """Test getting documents by category"""
+        if not self.category_id:
+            print("❌ No category ID available for testing")
+            return False
+            
+        print("\n📄 Testing Get Documents by Category")
+        success, response = self.run_test(
+            f"Get Documents for Category {self.category_id}",
+            "GET",
+            f"documents/{self.category_id}",
+            200
+        )
+        if success:
+            print(f"Retrieved {len(response)} documents")
+            if len(response) > 0:
+                print("Sample document:")
+                sample = response[0]
+                self.document_id = sample.get('id')
+                print(f"  ID: {self.document_id}")
+                print(f"  Name: {sample.get('name')}")
+                print(f"  Type: {sample.get('type')}")
+                print(f"  Size: {sample.get('size')}")
+        return success
+
+    def test_download_document(self):
+        """Test document download endpoint"""
+        if not self.document_id:
+            print("❌ No document ID available for testing")
+            return False
+            
+        print("\n📥 Testing Document Download")
+        success, response = self.run_test(
+            f"Download Document {self.document_id}",
+            "GET",
+            f"documents/{self.document_id}/download",
+            200
+        )
+        if success:
+            print(f"Document download URL: {response.get('download_url')}")
+        return success
+
 def main():
     print("=" * 50)
     print("Take 2 Studio Client Portal API Test")
@@ -150,11 +304,26 @@ def main():
     if not tester.test_get_profile():
         print("❌ Profile retrieval failed")
     
+    # Materials tests
     if not tester.test_get_materials():
         print("❌ Materials retrieval failed")
+    else:
+        tester.test_get_material_by_id()
+        tester.test_get_material_comments()
+        tester.test_add_material_comment()
+        tester.test_approve_material()
+        tester.test_request_revision()
     
+    # Campaigns tests
     if not tester.test_get_campaigns():
         print("❌ Campaigns retrieval failed")
+    
+    # Documents tests
+    if not tester.test_get_document_categories():
+        print("❌ Document categories retrieval failed")
+    else:
+        tester.test_get_documents_by_category()
+        tester.test_download_document()
 
     # Print results
     print("\n" + "=" * 50)
