@@ -623,7 +623,7 @@ async def get_all_clients(current_admin: AdminUser = Depends(get_current_admin))
         client_stats.append(ClientStatsResponse(
             id=client["id"],
             name=client["name"],
-            status=client["status"],
+            status=client.get("status", "active"),
             materials_count=materials_count,
             pending_approvals=pending_approvals,
             active_campaigns=active_campaigns,
