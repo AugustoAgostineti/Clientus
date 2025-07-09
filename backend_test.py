@@ -63,19 +63,21 @@ class Take2StudioAPITester:
         )
         return success
 
-    def test_login(self, email="demo@take2studio.com", password="demo123"):
+    def test_login(self, email="demo@take2studio.com", password="demo123", user_type="client"):
         """Test login and get token"""
-        print("\n🔐 Testing Login")
+        print(f"\n🔐 Testing {user_type.capitalize()} Login")
+        endpoint = "admin/auth/login" if user_type == "admin" else "auth/login"
         success, response = self.run_test(
-            "Login",
+            f"{user_type.capitalize()} Login",
             "POST",
-            "auth/login",
+            endpoint,
             200,
             data={"email": email, "password": password},
             auth=False
         )
         if success and 'access_token' in response:
             self.token = response['access_token']
+            self.user_type = user_type
             print(f"Token received: {self.token[:10]}...")
             return True
         return False
