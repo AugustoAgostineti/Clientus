@@ -600,14 +600,16 @@ class Take2StudioAPITester:
             
         print("\n📦 Testing Admin Bulk Actions")
         try:
-            url = f"{self.base_url}/admin/materials/bulk-actions"
+            # The API expects action and material_ids as query parameters
+            url = f"{self.base_url}/admin/materials/bulk-actions?action=approve"
             headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {self.token}'}
-            data = {
-                "action": "update_status",
-                "material_ids": [self.material_id],
-                "new_status": "awaiting_approval"
-            }
-            response = requests.post(url, json=data, headers=headers)
+            
+            # Send material_ids as a list in the query string
+            response = requests.post(
+                url, 
+                params={"material_ids": self.material_id},
+                headers=headers
+            )
             
             if response.status_code == 200:
                 self.tests_passed += 1
