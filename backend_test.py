@@ -13,6 +13,7 @@ class Take2StudioAPITester:
         self.material_id = None
         self.document_id = None
         self.category_id = None
+        self.user_type = None  # 'client' or 'admin'
 
     def run_test(self, name, method, endpoint, expected_status, data=None, auth=True):
         """Run a single API test"""
