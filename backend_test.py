@@ -588,19 +588,18 @@ class Take2StudioAPITester:
             return False
             
         print("\n📦 Testing Admin Bulk Actions")
-        success, response = self.run_test(
+        success, result = self.run_test(
             "Bulk Update Status",
             "POST",
-            "admin/materials/bulk-actions",
+            "admin/materials/bulk-actions?action=update_status",
             200,
             data={
-                "action": "update_status",
                 "material_ids": [self.material_id],
                 "new_status": "awaiting_approval"
             }
         )
         if success:
-            print(f"Bulk action result: {response.get('message')}")
+            print(f"Bulk action result: {result.get('message')}")
         return success
 
 def main():
