@@ -57,15 +57,39 @@ class ClientResponse(BaseModel):
     email: str
     created_at: datetime
 
+class Comment(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    text: str
+    client_name: str
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    status: str = "unread"  # "read", "unread"
+
+class CommentCreate(BaseModel):
+    text: str
+
+class CommentResponse(BaseModel):
+    id: str
+    text: str
+    client_name: str
+    timestamp: datetime
+    status: str
+
+class ApprovalHistory(BaseModel):
+    action: str  # "approved", "revision_requested", "published"
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    comment: Optional[str] = None
+
 class Material(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     client_id: str
     title: str
     description: str
     type: str  # "photo", "video", "carousel", "story"
-    status: str  # "planned", "in_production", "approved", "published"
+    status: str  # "planned", "in_production", "awaiting_approval", "approved", "revision_requested", "published"
     scheduled_date: datetime
     file_url: Optional[str] = None
+    comments: List[Comment] = []
+    approval_history: List[ApprovalHistory] = []
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 class MaterialCreate(BaseModel):
@@ -83,7 +107,32 @@ class MaterialResponse(BaseModel):
     status: str
     scheduled_date: datetime
     file_url: Optional[str] = None
+    comments: List[CommentResponse] = []
+    approval_history: List[ApprovalHistory] = []
     created_at: datetime
+
+class MaterialUpdate(BaseModel):
+    status: str
+    comment: Optional[str] = None
+
+class Document(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    client_id: str
+    name: str
+    category: str  # "strategy", "scripts", "briefs", "guidelines", "reports"
+    type: str  # "pdf", "doc", "docx", "jpg", "png"
+    size: str
+    file_url: str
+    upload_date: datetime = Field(default_factory=datetime.utcnow)
+
+class DocumentResponse(BaseModel):
+    id: str
+    name: str
+    category: str
+    type: str
+    size: str
+    file_url: str
+    upload_date: datetime
 
 class Campaign(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -193,6 +242,13 @@ async def get_materials(current_client: Client = Depends(get_current_client)):
     materials = await db.materials.find({"client_id": current_client.id}).to_list(1000)
     return [MaterialResponse(**material) for material in materials]
 
+@api_router.get("/materials/{material_id}", response_model=MaterialResponse)
+async def get_material(material_id: str, current_client: Client = Depends(get_current_client)):
+    material = await db.materials.find_one({"id": material_id, "client_id": current_client.id})
+    if not material:
+        raise HTTPException(status_code=404, detail="Material not found")
+    return MaterialResponse(**material)
+
 @api_router.post("/materials", response_model=MaterialResponse)
 async def create_material(material_data: MaterialCreate, current_client: Client = Depends(get_current_client)):
     material = Material(
@@ -207,6 +263,83 @@ async def create_material(material_data: MaterialCreate, current_client: Client 
     
     await db.materials.insert_one(material.dict())
     return MaterialResponse(**material.dict())
+
+@api_router.post("/materials/{material_id}/approve")
+async def approve_material(material_id: str, current_client: Client = Depends(get_current_client)):
+    # Find material
+    material = await db.materials.find_one({"id": material_id, "client_id": current_client.id})
+    if not material:
+        raise HTTPException(status_code=404, detail="Material not found")
+    
+    # Update status and add approval history
+    approval_entry = ApprovalHistory(action="approved")
+    
+    await db.materials.update_one(
+        {"id": material_id},
+        {
+            "$set": {"status": "approved"},
+            "$push": {"approval_history": approval_entry.dict()}
+        }
+    )
+    
+    return {"message": "Material approved successfully"}
+
+@api_router.post("/materials/{material_id}/request-revision")
+async def request_revision(material_id: str, comment_data: CommentCreate, current_client: Client = Depends(get_current_client)):
+    # Find material
+    material = await db.materials.find_one({"id": material_id, "client_id": current_client.id})
+    if not material:
+        raise HTTPException(status_code=404, detail="Material not found")
+    
+    # Create comment
+    comment = Comment(
+        text=comment_data.text,
+        client_name=current_client.name
+    )
+    
+    # Create approval history entry
+    approval_entry = ApprovalHistory(action="revision_requested", comment=comment_data.text)
+    
+    # Update material
+    await db.materials.update_one(
+        {"id": material_id},
+        {
+            "$set": {"status": "revision_requested"},
+            "$push": {
+                "comments": comment.dict(),
+                "approval_history": approval_entry.dict()
+            }
+        }
+    )
+    
+    return {"message": "Revision request submitted successfully"}
+
+@api_router.get("/materials/{material_id}/comments", response_model=List[CommentResponse])
+async def get_material_comments(material_id: str, current_client: Client = Depends(get_current_client)):
+    material = await db.materials.find_one({"id": material_id, "client_id": current_client.id})
+    if not material:
+        raise HTTPException(status_code=404, detail="Material not found")
+    
+    comments = material.get("comments", [])
+    return [CommentResponse(**comment) for comment in comments]
+
+@api_router.post("/materials/{material_id}/comments", response_model=CommentResponse)
+async def add_material_comment(material_id: str, comment_data: CommentCreate, current_client: Client = Depends(get_current_client)):
+    material = await db.materials.find_one({"id": material_id, "client_id": current_client.id})
+    if not material:
+        raise HTTPException(status_code=404, detail="Material not found")
+    
+    comment = Comment(
+        text=comment_data.text,
+        client_name=current_client.name
+    )
+    
+    await db.materials.update_one(
+        {"id": material_id},
+        {"$push": {"comments": comment.dict()}}
+    )
+    
+    return CommentResponse(**comment.dict())
 
 @api_router.get("/campaigns", response_model=List[CampaignResponse])
 async def get_campaigns(current_client: Client = Depends(get_current_client)):
@@ -233,6 +366,30 @@ async def get_campaigns(current_client: Client = Depends(get_current_client)):
     
     return campaign_responses
 
+@api_router.get("/documents/categories")
+async def get_document_categories(current_client: Client = Depends(get_current_client)):
+    categories = [
+        {"id": "strategy", "name": "📋 Posicionamento & Estratégia", "description": "Documentos estratégicos da marca"},
+        {"id": "scripts", "name": "🎬 Roteiros de Vídeos", "description": "Scripts e roteiros para conteúdo"},
+        {"id": "briefs", "name": "📊 Briefings de Campanhas", "description": "Briefings detalhados das campanhas"},
+        {"id": "guidelines", "name": "🎨 Guidelines Visuais", "description": "Manuais de identidade visual"},
+        {"id": "reports", "name": "📈 Relatórios", "description": "Relatórios de performance e resultados"}
+    ]
+    return categories
+
+@api_router.get("/documents/{category}", response_model=List[DocumentResponse])
+async def get_documents_by_category(category: str, current_client: Client = Depends(get_current_client)):
+    documents = await db.documents.find({"client_id": current_client.id, "category": category}).to_list(1000)
+    return [DocumentResponse(**doc) for doc in documents]
+
+@api_router.get("/documents/{document_id}/download")
+async def download_document(document_id: str, current_client: Client = Depends(get_current_client)):
+    document = await db.documents.find_one({"id": document_id, "client_id": current_client.id})
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    return {"download_url": document["file_url"]}
+
 # Seed data endpoint for demo
 @api_router.post("/seed")
 async def seed_demo_data():
@@ -248,21 +405,35 @@ async def seed_demo_data():
     if not existing:
         await db.clients.insert_one(demo_client.dict())
     
-    # Create demo materials
+    # Create demo materials with expanded status and comments
     demo_materials = [
         Material(
             client_id=demo_client.id,
             title="Instagram Post - New Product Launch",
-            description="Exciting announcement about our latest product line",
+            description="Exciting announcement about our latest product line with engaging visuals and compelling copy",
             type="photo",
-            status="approved",
+            status="awaiting_approval",
             scheduled_date=datetime(2025, 3, 15, 10, 0, 0),
-            file_url="https://images.unsplash.com/photo-1611162618071-b39a2ec055fb"
+            file_url="https://images.unsplash.com/photo-1611162618071-b39a2ec055fb",
+            comments=[
+                Comment(
+                    text="This looks great! Could we try a different background color to make it more vibrant?",
+                    client_name="Demo Client",
+                    timestamp=datetime.utcnow() - timedelta(hours=2)
+                ).dict()
+            ],
+            approval_history=[
+                ApprovalHistory(
+                    action="revision_requested",
+                    timestamp=datetime.utcnow() - timedelta(hours=2),
+                    comment="Background color change requested"
+                ).dict()
+            ]
         ),
         Material(
             client_id=demo_client.id,
             title="Facebook Video - Behind the Scenes",
-            description="Behind the scenes footage of our production process",
+            description="Behind the scenes footage of our production process showcasing our team at work",
             type="video",
             status="in_production",
             scheduled_date=datetime(2025, 3, 18, 14, 0, 0),
@@ -271,7 +442,7 @@ async def seed_demo_data():
         Material(
             client_id=demo_client.id,
             title="Story Series - Daily Tips",
-            description="5-part story series with daily marketing tips",
+            description="5-part story series with daily marketing tips for our audience",
             type="story",
             status="planned",
             scheduled_date=datetime(2025, 3, 20, 9, 0, 0)
@@ -279,11 +450,59 @@ async def seed_demo_data():
         Material(
             client_id=demo_client.id,
             title="Carousel Post - Portfolio Showcase",
-            description="Multi-image carousel showcasing recent client work",
+            description="Multi-image carousel showcasing recent client work and success stories",
             type="carousel",
             status="published",
             scheduled_date=datetime(2025, 3, 12, 16, 0, 0),
-            file_url="https://images.unsplash.com/photo-1651688945265-be97106bb317"
+            file_url="https://images.unsplash.com/photo-1651688945265-be97106bb317",
+            approval_history=[
+                ApprovalHistory(
+                    action="approved",
+                    timestamp=datetime.utcnow() - timedelta(days=1)
+                ).dict(),
+                ApprovalHistory(
+                    action="published",
+                    timestamp=datetime.utcnow() - timedelta(hours=6)
+                ).dict()
+            ]
+        ),
+        Material(
+            client_id=demo_client.id,
+            title="LinkedIn Article - Industry Insights",
+            description="Professional article about latest industry trends and insights",
+            type="photo",
+            status="approved",
+            scheduled_date=datetime(2025, 3, 22, 11, 0, 0),
+            file_url="https://images.unsplash.com/photo-1516321318423-f06f85e504b3",
+            approval_history=[
+                ApprovalHistory(
+                    action="approved",
+                    timestamp=datetime.utcnow() - timedelta(hours=12)
+                ).dict()
+            ]
+        ),
+        Material(
+            client_id=demo_client.id,
+            title="TikTok Video - Trending Challenge",
+            description="Creative video following the latest TikTok trend to increase engagement",
+            type="video",
+            status="revision_requested",
+            scheduled_date=datetime(2025, 3, 25, 15, 0, 0),
+            file_url="https://images.unsplash.com/photo-1598300042247-d088f8ab3a91",
+            comments=[
+                Comment(
+                    text="The concept is great, but could we make the opening more dynamic? Maybe add some text overlays?",
+                    client_name="Demo Client",
+                    timestamp=datetime.utcnow() - timedelta(hours=4)
+                ).dict()
+            ],
+            approval_history=[
+                ApprovalHistory(
+                    action="revision_requested",
+                    timestamp=datetime.utcnow() - timedelta(hours=4),
+                    comment="Opening needs to be more dynamic"
+                ).dict()
+            ]
         )
     ]
     
@@ -322,6 +541,61 @@ async def seed_demo_data():
         existing_campaign = await db.campaigns.find_one({"id": campaign.id})
         if not existing_campaign:
             await db.campaigns.insert_one(campaign.dict())
+    
+    # Create demo documents
+    demo_documents = [
+        Document(
+            client_id=demo_client.id,
+            name="Posicionamento da Marca - Janeiro 2025",
+            category="strategy",
+            type="pdf",
+            size="2.3 MB",
+            file_url="https://example.com/documents/positioning.pdf",
+            upload_date=datetime(2025, 1, 1, 0, 0, 0)
+        ),
+        Document(
+            client_id=demo_client.id,
+            name="Roteiro - Vídeo Institucional",
+            category="scripts",
+            type="pdf",
+            size="1.8 MB",
+            file_url="https://example.com/documents/video-script.pdf",
+            upload_date=datetime(2025, 1, 15, 0, 0, 0)
+        ),
+        Document(
+            client_id=demo_client.id,
+            name="Brief - Campanha Primavera",
+            category="briefs",
+            type="pdf",
+            size="3.1 MB",
+            file_url="https://example.com/documents/spring-brief.pdf",
+            upload_date=datetime(2025, 2, 1, 0, 0, 0)
+        ),
+        Document(
+            client_id=demo_client.id,
+            name="Manual de Identidade Visual",
+            category="guidelines",
+            type="pdf",
+            size="5.7 MB",
+            file_url="https://example.com/documents/brand-guidelines.pdf",
+            upload_date=datetime(2025, 1, 10, 0, 0, 0)
+        ),
+        Document(
+            client_id=demo_client.id,
+            name="Relatório de Performance - Fevereiro",
+            category="reports",
+            type="pdf",
+            size="2.9 MB",
+            file_url="https://example.com/documents/february-report.pdf",
+            upload_date=datetime(2025, 3, 1, 0, 0, 0)
+        )
+    ]
+    
+    # Insert demo documents
+    for doc in demo_documents:
+        existing_doc = await db.documents.find_one({"id": doc.id})
+        if not existing_doc:
+            await db.documents.insert_one(doc.dict())
     
     return {"message": "Demo data seeded successfully"}
 
