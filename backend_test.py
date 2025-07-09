@@ -84,18 +84,21 @@ class Take2StudioAPITester:
 
     def test_get_profile(self):
         """Test getting user profile"""
-        print("\n👤 Testing Get Profile")
+        print(f"\n👤 Testing Get {self.user_type.capitalize()} Profile")
+        endpoint = "admin/auth/me" if self.user_type == "admin" else "auth/me"
         success, response = self.run_test(
-            "Get Profile",
+            f"Get {self.user_type.capitalize()} Profile",
             "GET",
-            "auth/me",
+            endpoint,
             200
         )
         if success:
             self.client_id = response.get('id')
-            print(f"Client ID: {self.client_id}")
-            print(f"Client Name: {response.get('name')}")
-            print(f"Client Email: {response.get('email')}")
+            print(f"User ID: {self.client_id}")
+            print(f"User Name: {response.get('name')}")
+            print(f"User Email: {response.get('email')}")
+            if self.user_type == "admin":
+                print(f"User Role: {response.get('role')}")
         return success
 
     def test_get_materials(self):
