@@ -291,6 +291,155 @@ class Take2StudioAPITester:
         if success:
             print(f"Document download URL: {response.get('download_url')}")
         return success
+        
+    # =================== ADMIN API TESTS ===================
+    
+    def test_admin_dashboard_stats(self):
+        """Test getting admin dashboard stats"""
+        if self.user_type != "admin":
+            print("❌ Not logged in as admin")
+            return False
+            
+        print("\n📊 Testing Admin Dashboard Stats")
+        success, response = self.run_test(
+            "Get Admin Dashboard Stats",
+            "GET",
+            "admin/dashboard/stats",
+            200
+        )
+        if success:
+            print(f"Total Clients: {response.get('total_clients')}")
+            print(f"Active Clients: {response.get('active_clients')}")
+            print(f"Total Materials: {response.get('total_materials')}")
+            print(f"Pending Approvals: {response.get('pending_approvals')}")
+            print(f"Active Campaigns: {response.get('active_campaigns')}")
+        return success
+        
+    def test_admin_get_clients(self):
+        """Test getting all clients as admin"""
+        if self.user_type != "admin":
+            print("❌ Not logged in as admin")
+            return False
+            
+        print("\n👥 Testing Admin Get All Clients")
+        success, response = self.run_test(
+            "Get All Clients",
+            "GET",
+            "admin/clients",
+            200
+        )
+        if success:
+            print(f"Retrieved {len(response)} clients")
+            if len(response) > 0:
+                print("Sample client:")
+                sample = response[0]
+                print(f"  ID: {sample.get('id')}")
+                print(f"  Name: {sample.get('name')}")
+                print(f"  Status: {sample.get('status')}")
+                print(f"  Materials Count: {sample.get('materials_count')}")
+                print(f"  Pending Approvals: {sample.get('pending_approvals')}")
+        return success
+        
+    def test_admin_get_materials(self):
+        """Test getting all materials as admin"""
+        if self.user_type != "admin":
+            print("❌ Not logged in as admin")
+            return False
+            
+        print("\n📦 Testing Admin Get All Materials")
+        success, response = self.run_test(
+            "Get All Materials",
+            "GET",
+            "admin/materials",
+            200
+        )
+        if success:
+            print(f"Retrieved {len(response)} materials")
+            if len(response) > 0:
+                print("Sample material:")
+                sample = response[0]
+                print(f"  ID: {sample.get('id')}")
+                print(f"  Title: {sample.get('title')}")
+                print(f"  Client Name: {sample.get('client_name')}")
+                print(f"  Status: {sample.get('status')}")
+        return success
+        
+    def test_admin_get_campaigns(self):
+        """Test getting all campaigns as admin"""
+        if self.user_type != "admin":
+            print("❌ Not logged in as admin")
+            return False
+            
+        print("\n📊 Testing Admin Get All Campaigns")
+        success, response = self.run_test(
+            "Get All Campaigns",
+            "GET",
+            "admin/campaigns",
+            200
+        )
+        if success:
+            print(f"Retrieved {len(response)} campaigns")
+            if len(response) > 0:
+                print("Sample campaign:")
+                sample = response[0]
+                print(f"  Name: {sample.get('name')}")
+                print(f"  Client Name: {sample.get('client_name')}")
+                print(f"  Status: {sample.get('status')}")
+                print(f"  CTR: {sample.get('ctr')}%")
+                print(f"  Spend: {sample.get('spend')}")
+        return success
+        
+    def test_admin_get_documents(self):
+        """Test getting all documents as admin"""
+        if self.user_type != "admin":
+            print("❌ Not logged in as admin")
+            return False
+            
+        print("\n📄 Testing Admin Get All Documents")
+        success, response = self.run_test(
+            "Get All Documents",
+            "GET",
+            "admin/documents",
+            200
+        )
+        if success:
+            print(f"Retrieved {len(response)} documents")
+            if len(response) > 0:
+                print("Sample document:")
+                sample = response[0]
+                print(f"  ID: {sample.get('id')}")
+                print(f"  Name: {sample.get('name')}")
+                print(f"  Client Name: {sample.get('client_name')}")
+                print(f"  Category: {sample.get('category')}")
+        return success
+        
+    def test_admin_create_client(self):
+        """Test creating a new client as admin"""
+        if self.user_type != "admin":
+            print("❌ Not logged in as admin")
+            return False
+            
+        print("\n➕ Testing Admin Create Client")
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        client_data = {
+            "name": f"Test Client {timestamp}",
+            "email": f"test{timestamp}@example.com",
+            "password": "test123",
+            "contact_person": "Test Contact",
+            "project_type": "marketing_digital"
+        }
+        
+        success, response = self.run_test(
+            "Create Client",
+            "POST",
+            "admin/clients",
+            200,
+            data=client_data
+        )
+        if success:
+            print(f"Created client: {response.get('name')}")
+            print(f"Client ID: {response.get('id')}")
+        return success
 
 def main():
     print("=" * 50)
