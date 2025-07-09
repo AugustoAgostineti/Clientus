@@ -452,33 +452,56 @@ def main():
     # Run tests
     tester.test_seed_data()
     
-    if not tester.test_login():
-        print("❌ Login failed, stopping tests")
-        return 1
-
-    if not tester.test_get_profile():
-        print("❌ Profile retrieval failed")
+    # =================== CLIENT TESTS ===================
+    print("\n" + "=" * 50)
+    print("CLIENT PORTAL TESTS")
+    print("=" * 50)
     
-    # Materials tests
-    if not tester.test_get_materials():
-        print("❌ Materials retrieval failed")
+    if not tester.test_login(email="demo@take2studio.com", password="demo123", user_type="client"):
+        print("❌ Client login failed, stopping client tests")
     else:
-        tester.test_get_material_by_id()
-        tester.test_get_material_comments()
-        tester.test_add_material_comment()
-        tester.test_approve_material()
-        tester.test_request_revision()
+        if not tester.test_get_profile():
+            print("❌ Client profile retrieval failed")
+        
+        # Materials tests
+        if not tester.test_get_materials():
+            print("❌ Materials retrieval failed")
+        else:
+            tester.test_get_material_by_id()
+            tester.test_get_material_comments()
+            tester.test_add_material_comment()
+            tester.test_approve_material()
+            tester.test_request_revision()
+        
+        # Campaigns tests
+        if not tester.test_get_campaigns():
+            print("❌ Campaigns retrieval failed")
+        
+        # Documents tests
+        if not tester.test_get_document_categories():
+            print("❌ Document categories retrieval failed")
+        else:
+            tester.test_get_documents_by_category()
+            tester.test_download_document()
     
-    # Campaigns tests
-    if not tester.test_get_campaigns():
-        print("❌ Campaigns retrieval failed")
+    # =================== ADMIN TESTS ===================
+    print("\n" + "=" * 50)
+    print("ADMIN DASHBOARD TESTS")
+    print("=" * 50)
     
-    # Documents tests
-    if not tester.test_get_document_categories():
-        print("❌ Document categories retrieval failed")
+    if not tester.test_login(email="admin@take2studio.com", password="admin123", user_type="admin"):
+        print("❌ Admin login failed, stopping admin tests")
     else:
-        tester.test_get_documents_by_category()
-        tester.test_download_document()
+        if not tester.test_get_profile():
+            print("❌ Admin profile retrieval failed")
+        
+        # Admin dashboard tests
+        tester.test_admin_dashboard_stats()
+        tester.test_admin_get_clients()
+        tester.test_admin_get_materials()
+        tester.test_admin_get_campaigns()
+        tester.test_admin_get_documents()
+        tester.test_admin_create_client()
 
     # Print results
     print("\n" + "=" * 50)
