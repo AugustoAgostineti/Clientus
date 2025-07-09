@@ -1415,6 +1415,8 @@ const MaterialPreviewEditModal = ({ material, onClose, onSubmit, clients }) => {
     </div>
   );
 };
+// Create Client Modal
+const CreateClientModal = ({ onClose, onSubmit }) => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
