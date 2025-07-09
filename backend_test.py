@@ -358,10 +358,14 @@ class Take2StudioAPITester:
             if len(response) > 0:
                 print("Sample material:")
                 sample = response[0]
-                print(f"  ID: {sample.get('id')}")
+                self.material_id = sample.get('id')
+                print(f"  ID: {self.material_id}")
                 print(f"  Title: {sample.get('title')}")
                 print(f"  Client Name: {sample.get('client_name')}")
                 print(f"  Status: {sample.get('status')}")
+                print(f"  Type: {sample.get('type')}")
+                if sample.get('tags'):
+                    print(f"  Tags: {', '.join(sample.get('tags'))}")
         return success
         
     def test_admin_get_campaigns(self):
