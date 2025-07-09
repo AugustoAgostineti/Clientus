@@ -592,19 +592,24 @@ class Take2StudioAPITester:
             return False
             
         print("\n📦 Testing Admin Bulk Actions")
-        success, result = self.run_test(
-            "Bulk Update Status",
-            "POST",
-            "admin/materials/bulk-actions?action=update_status",
-            200,
-            data={
-                "material_ids": [self.material_id],
-                "new_status": "awaiting_approval"
-            }
-        )
-        if success:
-            print(f"Bulk action result: {result.get('message')}")
-        return success
+        try:
+            # The API expects a list of material IDs in the request body
+            success, result = self.run_test(
+                "Bulk Approve",
+                "POST",
+                "admin/materials/bulk-actions",
+                200,
+                data={
+                    "action": "approve",
+                    "material_ids": [self.material_id]
+                }
+            )
+            if success:
+                print(f"Bulk action result: {result.get('message')}")
+            return success
+        except Exception as e:
+            print(f"❌ Error performing bulk action: {str(e)}")
+            return False
 
 def main():
     print("=" * 50)
