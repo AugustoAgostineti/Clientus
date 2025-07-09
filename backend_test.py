@@ -501,7 +501,7 @@ class Take2StudioAPITester:
             "tags": ["updated", "test", "api"]
         }
         
-        success, response = self.run_test(
+        success, result = self.run_test(
             "Update Material",
             "PUT",
             f"admin/materials/{self.material_id}",
@@ -509,9 +509,9 @@ class Take2StudioAPITester:
             data=update_data
         )
         if success:
-            print(f"Updated material: {response.get('title')}")
-            print(f"New status: {response.get('status')}")
-            print(f"Tags: {', '.join(response.get('tags', []))}")
+            print(f"Updated material: {result.get('title')}")
+            print(f"New status: {result.get('status')}")
+            print(f"Tags: {', '.join(result.get('tags', []))}")
         return success
         
     def test_admin_material_filters(self):
