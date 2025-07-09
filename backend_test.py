@@ -417,32 +417,161 @@ class Take2StudioAPITester:
                 print(f"  Category: {sample.get('category')}")
         return success
         
-    def test_admin_create_client(self):
-        """Test creating a new client as admin"""
+    def test_admin_create_material(self):
+        """Test creating a new material as admin"""
         if self.user_type != "admin":
             print("❌ Not logged in as admin")
             return False
             
-        print("\n➕ Testing Admin Create Client")
+        if not self.client_id:
+            print("❌ No client ID available for testing")
+            return False
+            
+        print("\n➕ Testing Admin Create Material")
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        client_data = {
-            "name": f"Test Client {timestamp}",
-            "email": f"test{timestamp}@example.com",
-            "password": "test123",
-            "contact_person": "Test Contact",
-            "project_type": "marketing_digital"
+        scheduled_date = (datetime.now()).isoformat()
+        
+        material_data = {
+            "client_id": self.client_id,
+            "title": f"Test Material {timestamp}",
+            "description": "This is a test material created via API",
+            "type": "photo",
+            "scheduled_date": scheduled_date,
+            "tags": ["test", "api", "automation"]
         }
         
         success, response = self.run_test(
-            "Create Client",
+            "Create Material",
             "POST",
-            "admin/clients",
+            "admin/materials",
             200,
-            data=client_data
+            data=material_data
         )
         if success:
-            print(f"Created client: {response.get('name')}")
-            print(f"Client ID: {response.get('id')}")
+            print(f"Created material: {response.get('title')}")
+            print(f"Material ID: {response.get('id')}")
+            self.material_id = response.get('id')
+        return success
+        
+    def test_admin_update_material(self):
+        """Test updating a material as admin"""
+        if self.user_type != "admin":
+            print("❌ Not logged in as admin")
+            return False
+            
+        if not self.material_id:
+            print("❌ No material ID available for testing")
+            return False
+            
+        print("\n✏️ Testing Admin Update Material")
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        
+        update_data = {
+            "title": f"Updated Material {timestamp}",
+            "status": "in_production",
+            "tags": ["updated", "test", "api"]
+        }
+        
+        success, response = self.run_test(
+            "Update Material",
+            "PUT",
+            f"admin/materials/{self.material_id}",
+            200,
+            data=update_data
+        )
+        if success:
+            print(f"Updated material: {response.get('title')}")
+            print(f"New status: {response.get('status')}")
+            print(f"Tags: {', '.join(response.get('tags', []))}")
+        return success
+        
+    def test_admin_material_filters(self):
+        """Test getting material filters"""
+        if self.user_type != "admin":
+            print("❌ Not logged in as admin")
+            return False
+            
+        print("\n🔍 Testing Admin Material Filters")
+        success, response = self.run_test(
+            "Get Material Filters",
+            "GET",
+            "admin/materials/filters",
+            200
+        )
+        if success:
+            print(f"Retrieved filter options:")
+            if 'clients' in response:
+                print(f"  Clients: {len(response['clients'])}")
+            if 'statuses' in response:
+                print(f"  Statuses: {[status['_id'] for status in response['statuses']]}")
+            if 'types' in response:
+                print(f"  Types: {[type['_id'] for type in response['types']]}")
+        return success
+        
+    def test_admin_material_search(self):
+        """Test searching materials"""
+        if self.user_type != "admin":
+            print("❌ Not logged in as admin")
+            return False
+            
+        print("\n🔎 Testing Admin Material Search")
+        success, response = self.run_test(
+            "Search Materials",
+            "GET",
+            "admin/materials/search",
+            200
+        )
+        if success:
+            print(f"Search results: {response.get('total')} materials found")
+            print(f"Page: {response.get('page')} of {response.get('total_pages')}")
+            if response.get('materials') and len(response.get('materials')) > 0:
+                print(f"First result: {response['materials'][0].get('title')}")
+        return success
+        
+    def test_admin_material_tags_autocomplete(self):
+        """Test material tags autocomplete"""
+        if self.user_type != "admin":
+            print("❌ Not logged in as admin")
+            return False
+            
+        print("\n🏷️ Testing Admin Material Tags Autocomplete")
+        success, response = self.run_test(
+            "Tags Autocomplete",
+            "GET",
+            "admin/materials/tags/autocomplete?q=te",
+            200
+        )
+        if success:
+            print(f"Retrieved {len(response)} tag suggestions")
+            if len(response) > 0:
+                for tag in response:
+                    print(f"  Tag: {tag.get('tag')} (Count: {tag.get('count')})")
+        return success
+        
+    def test_admin_bulk_actions(self):
+        """Test bulk actions on materials"""
+        if self.user_type != "admin":
+            print("❌ Not logged in as admin")
+            return False
+            
+        if not self.material_id:
+            print("❌ No material ID available for testing")
+            return False
+            
+        print("\n📦 Testing Admin Bulk Actions")
+        success, response = self.run_test(
+            "Bulk Update Status",
+            "POST",
+            "admin/materials/bulk-actions",
+            200,
+            data={
+                "action": "update_status",
+                "material_ids": [self.material_id],
+                "new_status": "awaiting_approval"
+            }
+        )
+        if success:
+            print(f"Bulk action result: {response.get('message')}")
         return success
 
 def main():
