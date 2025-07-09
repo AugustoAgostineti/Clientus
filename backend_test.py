@@ -502,18 +502,25 @@ class Take2StudioAPITester:
         }
         
         try:
-            success, result = self.run_test(
-                "Update Material",
-                "PUT",
-                f"admin/materials/{self.material_id}",
-                200,
-                data=update_data
-            )
-            if success:
+            url = f"{self.base_url}/admin/materials/{self.material_id}"
+            headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {self.token}'}
+            response = requests.put(url, json=update_data, headers=headers)
+            
+            if response.status_code == 200:
+                self.tests_passed += 1
+                print(f"✅ Passed - Status: {response.status_code}")
+                result = response.json()
                 print(f"Updated material: {result.get('title')}")
                 print(f"New status: {result.get('status')}")
                 print(f"Tags: {', '.join(result.get('tags', []))}")
-            return success
+                return True
+            else:
+                print(f"❌ Failed - Expected 200, got {response.status_code}")
+                try:
+                    print(f"Response: {response.json()}")
+                except:
+                    print(f"Response: {response.text}")
+                return False
         except Exception as e:
             print(f"❌ Error updating material: {str(e)}")
             return False
