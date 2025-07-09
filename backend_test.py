@@ -635,6 +635,14 @@ def main():
         tester.test_admin_get_campaigns()
         tester.test_admin_get_documents()
         tester.test_admin_create_client()
+        
+        # Material management tests
+        tester.test_admin_create_material()
+        tester.test_admin_update_material()
+        tester.test_admin_material_filters()
+        tester.test_admin_material_search()
+        tester.test_admin_material_tags_autocomplete()
+        tester.test_admin_bulk_actions()
 
     # Print results
     print("\n" + "=" * 50)
