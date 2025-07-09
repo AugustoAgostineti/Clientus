@@ -417,6 +417,35 @@ class Take2StudioAPITester:
                 print(f"  Category: {sample.get('category')}")
         return success
         
+    def test_admin_create_client(self):
+        """Test creating a new client as admin"""
+        if self.user_type != "admin":
+            print("❌ Not logged in as admin")
+            return False
+            
+        print("\n➕ Testing Admin Create Client")
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        client_data = {
+            "name": f"Test Client {timestamp}",
+            "email": f"test{timestamp}@example.com",
+            "password": "test123",
+            "contact_person": "Test Contact",
+            "project_type": "marketing_digital"
+        }
+        
+        success, response = self.run_test(
+            "Create Client",
+            "POST",
+            "admin/clients",
+            200,
+            data=client_data
+        )
+        if success:
+            print(f"Created client: {response.get('name')}")
+            print(f"Client ID: {response.get('id')}")
+            self.client_id = response.get('id')
+        return success
+        
     def test_admin_create_material(self):
         """Test creating a new material as admin"""
         if self.user_type != "admin":
