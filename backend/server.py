@@ -404,6 +404,9 @@ async def seed_demo_data():
     existing = await db.clients.find_one({"email": demo_client.email})
     if not existing:
         await db.clients.insert_one(demo_client.dict())
+    else:
+        # Use existing client ID
+        demo_client.id = existing["id"]
     
     # Create demo materials with expanded status and comments
     demo_materials = [
