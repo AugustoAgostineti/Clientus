@@ -944,30 +944,460 @@ const CreateClientModal = ({ onClose, onSubmit }) => {
 };
 
 // Placeholder pages for other admin sections
-const AdminMaterialsPage = ({ materials, clients }) => {
+// Placeholder pages for other admin sections
+const AdminMaterialsPage = ({ materials, clients, onRefresh }) => {
+  const { addToast } = React.useContext(ToastContext);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [selectedMaterial, setSelectedMaterial] = useState(null);
+  const [selectedMaterials, setSelectedMaterials] = useState([]);
+  const [filters, setFilters] = useState({
+    client: 'all',
+    status: 'all',
+    type: 'all',
+    search: ''
+  });
+  const [allMaterials, setAllMaterials] = useState(materials);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setAllMaterials(materials);
+  }, [materials]);
+
+  const handleUploadMaterial = async (materialData) => {
+    try {
+      setLoading(true);
+      await axios.post('/admin/materials', materialData);
+      addToast('Material enviado com sucesso! ✅');
+      setShowUploadModal(false);
+      onRefresh();
+    } catch (error) {
+      console.error('Error uploading material:', error);
+      addToast('Erro ao enviar material', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateMaterial = async (materialId, updateData) => {
+    try {
+      setLoading(true);
+      await axios.put(`/admin/materials/${materialId}`, updateData);
+      addToast('Material atualizado com sucesso! 📊');
+      setShowPreviewModal(false);
+      onRefresh();
+    } catch (error) {
+      console.error('Error updating material:', error);
+      addToast('Erro ao atualizar material', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteMaterial = async (materialId) => {
+    if (!confirm('Tem certeza que deseja excluir este material?')) return;
+    
+    try {
+      setLoading(true);
+      await axios.delete(`/admin/materials/${materialId}`);
+      addToast('Material excluído com sucesso! 🗑️');
+      onRefresh();
+    } catch (error) {
+      console.error('Error deleting material:', error);
+      addToast('Erro ao excluir material', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBulkAction = async (action, newStatus = null) => {
+    if (selectedMaterials.length === 0) {
+      addToast('Selecione pelo menos um material', 'error');
+      return;
+    }
+
+    if (action === 'delete' && !confirm(`Tem certeza que deseja excluir ${selectedMaterials.length} materiais?`)) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await axios.post('/admin/materials/bulk-actions', {
+        action,
+        material_ids: selectedMaterials,
+        new_status: newStatus
+      });
+      addToast(`Ação realizada em ${selectedMaterials.length} materiais! ✅`);
+      setSelectedMaterials([]);
+      onRefresh();
+    } catch (error) {
+      console.error('Error performing bulk action:', error);
+      addToast('Erro ao realizar ação em lote', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFilterChange = (key, value) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  const filteredMaterials = allMaterials.filter(material => {
+    if (filters.client !== 'all' && material.client_id !== filters.client) return false;
+    if (filters.status !== 'all' && material.status !== filters.status) return false;
+    if (filters.type !== 'all' && material.type !== filters.type) return false;
+    if (filters.search && !material.title.toLowerCase().includes(filters.search.toLowerCase()) && 
+        !material.description.toLowerCase().includes(filters.search.toLowerCase())) return false;
+    return true;
+  });
+
+  const handleMaterialSelect = (materialId) => {
+    setSelectedMaterials(prev => 
+      prev.includes(materialId) 
+        ? prev.filter(id => id !== materialId)
+        : [...prev, materialId]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedMaterials.length === filteredMaterials.length) {
+      setSelectedMaterials([]);
+    } else {
+      setSelectedMaterials(filteredMaterials.map(m => m.id));
+    }
+  };
+
+  const getStatusColor = (status) => {
+    const colors = {
+      planned: 'bg-yellow-100 text-yellow-800',
+      in_production: 'bg-blue-100 text-blue-800',
+      awaiting_approval: 'bg-orange-100 text-orange-800',
+      approved: 'bg-green-100 text-green-800',
+      revision_requested: 'bg-red-100 text-red-800',
+      published: 'bg-gray-100 text-gray-800'
+    };
+    return colors[status] || 'bg-gray-100 text-gray-800';
+  };
+
+  const getStatusIcon = (status) => {
+    const icons = {
+      planned: '🟡',
+      in_production: '🔵',
+      awaiting_approval: '🟠',
+      approved: '🟢',
+      revision_requested: '🔴',
+      published: '⚫'
+    };
+    return icons[status] || '⚪';
+  };
+
   return (
     <div className="p-8">
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">Gestão de Materiais</h1>
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <p className="text-gray-600">Total de {materials.length} materiais</p>
-        <div className="mt-4 space-y-2">
-          {materials.slice(0, 10).map(material => (
-            <div key={material.id} className="flex justify-between items-center py-2 border-b">
-              <div>
-                <span className="font-medium">{material.title}</span>
-                <span className="text-gray-500 ml-2">- {material.client_name}</span>
-              </div>
-              <span className={`px-2 py-1 rounded text-xs ${
-                material.status === 'published' ? 'bg-green-100 text-green-800' :
-                material.status === 'approved' ? 'bg-blue-100 text-blue-800' :
-                'bg-yellow-100 text-yellow-800'
-              }`}>
-                {material.status}
-              </span>
+      {/* Header */}
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Gestão de Materiais</h1>
+          <p className="mt-2 text-gray-600">Upload, organize e gerencie todos os materiais dos clientes</p>
+        </div>
+        <div className="flex space-x-3">
+          <button
+            onClick={() => setShowUploadModal(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center"
+          >
+            <span className="mr-2">🔵</span>
+            Upload Material
+          </button>
+          <button className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 flex items-center">
+            <span className="mr-2">📅</span>
+            Agendar Lote
+          </button>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+        <div className="flex flex-wrap gap-4 mb-4">
+          <div className="min-w-[200px]">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Cliente</label>
+            <select
+              value={filters.client}
+              onChange={(e) => handleFilterChange('client', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="all">Todos os Clientes</option>
+              {clients.map(client => (
+                <option key={client.id} value={client.id}>
+                  {client.name} ({client.materials_count})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="min-w-[150px]">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <select
+              value={filters.status}
+              onChange={(e) => handleFilterChange('status', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="all">Todos</option>
+              <option value="planned">🟡 Planejado</option>
+              <option value="in_production">🔵 Em Produção</option>
+              <option value="awaiting_approval">🟠 Aguardando Aprovação</option>
+              <option value="approved">🟢 Aprovado</option>
+              <option value="revision_requested">🔴 Revisão Solicitada</option>
+              <option value="published">⚫ Publicado</option>
+            </select>
+          </div>
+
+          <div className="min-w-[120px]">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+            <select
+              value={filters.type}
+              onChange={(e) => handleFilterChange('type', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="all">Todos</option>
+              <option value="photo">📷 Foto</option>
+              <option value="video">🎬 Vídeo</option>
+              <option value="carousel">🔄 Carrossel</option>
+              <option value="story">📱 Stories</option>
+            </select>
+          </div>
+
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Buscar por título, legenda..."
+                value={filters.search}
+                onChange={(e) => handleFilterChange('search', e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              />
+              <svg className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
             </div>
+          </div>
+        </div>
+
+        {/* Quick Status Filters */}
+        <div className="flex flex-wrap gap-2">
+          <span className="text-sm text-gray-500 mr-2">Filtros rápidos:</span>
+          {[
+            { key: 'all', label: 'Todos', icon: '📋' },
+            { key: 'awaiting_approval', label: 'Pendentes', icon: '🟠' },
+            { key: 'approved', label: 'Aprovados', icon: '🟢' },
+            { key: 'revision_requested', label: 'Revisão', icon: '🔴' },
+            { key: 'published', label: 'Publicados', icon: '⚫' }
+          ].map(filter => (
+            <button
+              key={filter.key}
+              onClick={() => handleFilterChange('status', filter.key)}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                filters.status === filter.key
+                  ? 'bg-blue-100 text-blue-800'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {filter.icon} {filter.label}
+            </button>
           ))}
         </div>
       </div>
+
+      {/* Bulk Actions */}
+      {selectedMaterials.length > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-blue-900">
+              {selectedMaterials.length} material(is) selecionado(s)
+            </span>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => handleBulkAction('approve')}
+                className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+              >
+                ✅ Aprovar
+              </button>
+              <button
+                onClick={() => handleBulkAction('update_status', 'awaiting_approval')}
+                className="px-3 py-1 bg-orange-600 text-white rounded text-sm hover:bg-orange-700"
+              >
+                📤 Enviar p/ Aprovação
+              </button>
+              <button
+                onClick={() => handleBulkAction('delete')}
+                className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+              >
+                🗑️ Excluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Materials List */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-medium text-gray-900">
+              Materiais ({filteredMaterials.length})
+            </h3>
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                checked={selectedMaterials.length === filteredMaterials.length && filteredMaterials.length > 0}
+                onChange={handleSelectAll}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <label className="text-sm text-gray-600">Selecionar todos</label>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6">
+          {loading ? (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+              <p className="mt-2 text-gray-600">Carregando materiais...</p>
+            </div>
+          ) : filteredMaterials.length === 0 ? (
+            <div className="text-center py-8">
+              <div className="w-24 h-24 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+                <span className="text-4xl">📂</span>
+              </div>
+              <p className="text-gray-500">Nenhum material encontrado para este filtro</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredMaterials.map((material) => (
+                <div key={material.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-start justify-between mb-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedMaterials.includes(material.id)}
+                      onChange={() => handleMaterialSelect(material.id)}
+                      className="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <div className="flex-1 ml-3">
+                      <div className="flex items-center mb-2">
+                        {material.file_url && (
+                          <img
+                            src={material.file_url}
+                            alt={material.title}
+                            className="w-16 h-16 rounded-lg object-cover mr-3"
+                          />
+                        )}
+                        <div className="flex-1">
+                          <h4 className="font-medium text-gray-900 text-sm">{material.title}</h4>
+                          <p className="text-xs text-gray-600">{material.client_name}</p>
+                          <p className="text-xs text-gray-500">
+                            📅 {new Date(material.scheduled_date).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center justify-between mb-2">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(material.status)}`}>
+                          {getStatusIcon(material.status)} {material.status.replace('_', ' ')}
+                        </span>
+                        <span className="text-xs text-gray-500">{material.type}</span>
+                      </div>
+                      
+                      <p className="text-xs text-gray-600 mb-2 line-clamp-2">{material.description}</p>
+                      
+                      {material.tags && material.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mb-3">
+                          {material.tags.slice(0, 3).map((tag, index) => (
+                            <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
+                              #{tag}
+                            </span>
+                          ))}
+                          {material.tags.length > 3 && (
+                            <span className="text-xs text-gray-500">+{material.tags.length - 3}</span>
+                          )}
+                        </div>
+                      )}
+                      
+                      <div className="flex flex-wrap gap-2 text-xs">
+                        <button
+                          onClick={() => {
+                            setSelectedMaterial(material);
+                            setShowPreviewModal(true);
+                          }}
+                          className="text-blue-600 hover:text-blue-800"
+                        >
+                          👁️ Preview
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelectedMaterial(material);
+                            setShowPreviewModal(true);
+                          }}
+                          className="text-gray-600 hover:text-gray-800"
+                        >
+                          ✏️ Editar
+                        </button>
+                        {material.status === 'in_production' && (
+                          <button
+                            onClick={() => handleUpdateMaterial(material.id, { status: 'awaiting_approval' })}
+                            className="text-orange-600 hover:text-orange-800"
+                          >
+                            📤 Enviar p/ Aprovação
+                          </button>
+                        )}
+                        {material.status === 'awaiting_approval' && (
+                          <button
+                            onClick={() => handleUpdateMaterial(material.id, { status: 'approved' })}
+                            className="text-green-600 hover:text-green-800"
+                          >
+                            ✅ Aprovar
+                          </button>
+                        )}
+                        {material.comments && material.comments.length > 0 && (
+                          <button className="text-purple-600 hover:text-purple-800">
+                            💬 Comentários ({material.comments.length})
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDeleteMaterial(material.id)}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          🗑️ Excluir
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Upload Modal */}
+      {showUploadModal && (
+        <MaterialUploadModal
+          onClose={() => setShowUploadModal(false)}
+          onSubmit={handleUploadMaterial}
+          clients={clients}
+        />
+      )}
+
+      {/* Preview/Edit Modal */}
+      {showPreviewModal && selectedMaterial && (
+        <MaterialPreviewEditModal
+          material={selectedMaterial}
+          onClose={() => {
+            setShowPreviewModal(false);
+            setSelectedMaterial(null);
+          }}
+          onSubmit={handleUpdateMaterial}
+          clients={clients}
+        />
+      )}
     </div>
   );
 };
