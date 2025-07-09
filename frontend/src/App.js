@@ -827,8 +827,594 @@ const AdminClientsPage = ({ clients, onRefresh }) => {
   );
 };
 
-// Create Client Modal
-const CreateClientModal = ({ onClose, onSubmit }) => {
+// Material Upload Modal
+const MaterialUploadModal = ({ onClose, onSubmit, clients }) => {
+  const [formData, setFormData] = useState({
+    client_id: '',
+    title: '',
+    description: '',
+    type: 'photo',
+    scheduled_date: '',
+    file_url: '',
+    tags: []
+  });
+  const [file, setFile] = useState(null);
+  const [dragOver, setDragOver] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [tagInput, setTagInput] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!formData.client_id || !formData.title || !formData.scheduled_date) {
+      alert('Por favor, preencha todos os campos obrigatórios');
+      return;
+    }
+
+    setUploading(true);
+    
+    // Simulate file upload - in real app, would upload to storage service
+    let fileUrl = formData.file_url;
+    if (file) {
+      // Create a temporary URL for demo purposes
+      fileUrl = URL.createObjectURL(file);
+    }
+
+    const materialData = {
+      ...formData,
+      file_url: fileUrl,
+      scheduled_date: new Date(formData.scheduled_date).toISOString(),
+      tags: formData.tags.filter(tag => tag.trim() !== '')
+    };
+
+    try {
+      await onSubmit(materialData);
+    } catch (error) {
+      console.error('Error uploading material:', error);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleFileChange = (e) => {
+    const selectedFile = e.target.files[0];
+    if (selectedFile) {
+      setFile(selectedFile);
+      setFormData(prev => ({ ...prev, file_url: URL.createObjectURL(selectedFile) }));
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setDragOver(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    
+    const droppedFile = e.dataTransfer.files[0];
+    if (droppedFile) {
+      setFile(droppedFile);
+      setFormData(prev => ({ ...prev, file_url: URL.createObjectURL(droppedFile) }));
+    }
+  };
+
+  const handleAddTag = (e) => {
+    if (e.key === 'Enter' && tagInput.trim()) {
+      e.preventDefault();
+      const newTag = tagInput.trim().replace('#', '');
+      if (!formData.tags.includes(newTag)) {
+        setFormData(prev => ({
+          ...prev,
+          tags: [...prev.tags, newTag]
+        }));
+      }
+      setTagInput('');
+    }
+  };
+
+  const handleRemoveTag = (tagToRemove) => {
+    setFormData(prev => ({
+      ...prev,
+      tags: prev.tags.filter(tag => tag !== tagToRemove)
+    }));
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-semibold text-gray-900">Upload de Material</h2>
+            <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Client Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Cliente *
+              </label>
+              <select
+                value={formData.client_id}
+                onChange={(e) => setFormData(prev => ({ ...prev, client_id: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                required
+              >
+                <option value="">Selecione um cliente</option>
+                {clients.map(client => (
+                  <option key={client.id} value={client.id}>
+                    {client.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Material Type */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Tipo de Material
+              </label>
+              <div className="flex space-x-4">
+                {[
+                  { value: 'photo', label: 'Foto', icon: '📷' },
+                  { value: 'video', label: 'Vídeo', icon: '🎬' },
+                  { value: 'carousel', label: 'Carrossel', icon: '🔄' },
+                  { value: 'story', label: 'Stories', icon: '📱' }
+                ].map(type => (
+                  <label key={type.value} className="flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      name="type"
+                      value={type.value}
+                      checked={formData.type === type.value}
+                      onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value }))}
+                      className="mr-2"
+                    />
+                    <span>{type.icon} {type.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* File Upload */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Arquivo
+              </label>
+              <div
+                className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+                  dragOver ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
+                }`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onClick={() => document.getElementById('file-input').click()}
+              >
+                <input
+                  id="file-input"
+                  type="file"
+                  accept="image/*,video/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+                
+                {formData.file_url ? (
+                  <div className="space-y-2">
+                    <img
+                      src={formData.file_url}
+                      alt="Preview"
+                      className="max-h-32 mx-auto rounded-lg"
+                    />
+                    <p className="text-sm text-gray-600">Arquivo selecionado</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mx-auto">
+                      <span className="text-2xl">📎</span>
+                    </div>
+                    <p className="text-gray-600">Arraste arquivo aqui ou clique</p>
+                    <p className="text-sm text-gray-500">JPG, PNG, MP4, etc. (máx 100MB)</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Title */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Título *
+              </label>
+              <input
+                type="text"
+                value={formData.title}
+                onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Ex: Post Instagram - Promoção Janeiro"
+                required
+              />
+            </div>
+
+            {/* Scheduled Date */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Data de Publicação *
+              </label>
+              <input
+                type="datetime-local"
+                value={formData.scheduled_date}
+                onChange={(e) => setFormData(prev => ({ ...prev, scheduled_date: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                required
+              />
+            </div>
+
+            {/* Description */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Legenda
+              </label>
+              <textarea
+                value={formData.description}
+                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                rows="3"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Legenda do post, roteiro, ou descrição detalhada..."
+              />
+            </div>
+
+            {/* Tags */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Tags
+              </label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {formData.tags.map((tag, index) => (
+                  <span
+                    key={index}
+                    className="inline-flex items-center px-2 py-1 rounded-full text-sm bg-blue-100 text-blue-800"
+                  >
+                    #{tag}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveTag(tag)}
+                      className="ml-1 text-blue-600 hover:text-blue-800"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <input
+                type="text"
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={handleAddTag}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Digite uma tag e pressione Enter"
+              />
+            </div>
+
+            {/* Submit Buttons */}
+            <div className="flex justify-end space-x-3 pt-4">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={uploading}
+                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={uploading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+              >
+                {uploading ? 'Enviando...' : 'Salvar'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Material Preview/Edit Modal
+const MaterialPreviewEditModal = ({ material, onClose, onSubmit, clients }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [formData, setFormData] = useState({
+    client_id: material.client_id,
+    title: material.title,
+    description: material.description,
+    type: material.type,
+    scheduled_date: material.scheduled_date ? material.scheduled_date.split('T')[0] + 'T' + material.scheduled_date.split('T')[1].slice(0, 5) : '',
+    status: material.status,
+    tags: material.tags || []
+  });
+  const [tagInput, setTagInput] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    const updateData = {
+      ...formData,
+      scheduled_date: new Date(formData.scheduled_date).toISOString()
+    };
+
+    try {
+      await onSubmit(material.id, updateData);
+      setIsEditing(false);
+    } catch (error) {
+      console.error('Error updating material:', error);
+    }
+  };
+
+  const handleAddTag = (e) => {
+    if (e.key === 'Enter' && tagInput.trim()) {
+      e.preventDefault();
+      const newTag = tagInput.trim().replace('#', '');
+      if (!formData.tags.includes(newTag)) {
+        setFormData(prev => ({
+          ...prev,
+          tags: [...prev.tags, newTag]
+        }));
+      }
+      setTagInput('');
+    }
+  };
+
+  const handleRemoveTag = (tagToRemove) => {
+    setFormData(prev => ({
+      ...prev,
+      tags: prev.tags.filter(tag => tag !== tagToRemove)
+    }));
+  };
+
+  const getStatusColor = (status) => {
+    const colors = {
+      planned: 'bg-yellow-100 text-yellow-800',
+      in_production: 'bg-blue-100 text-blue-800',
+      awaiting_approval: 'bg-orange-100 text-orange-800',
+      approved: 'bg-green-100 text-green-800',
+      revision_requested: 'bg-red-100 text-red-800',
+      published: 'bg-gray-100 text-gray-800'
+    };
+    return colors[status] || 'bg-gray-100 text-gray-800';
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          {/* Header */}
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-semibold text-gray-900">
+              {isEditing ? 'Editar Material' : 'Preview do Material'}
+            </h2>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setIsEditing(!isEditing)}
+                className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+              >
+                {isEditing ? 'Cancelar Edição' : 'Editar'}
+              </button>
+              <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Media Preview */}
+            <div className="bg-gray-100 rounded-lg p-4 text-center">
+              {material.file_url ? (
+                <img
+                  src={material.file_url}
+                  alt={material.title}
+                  className="max-w-full max-h-96 mx-auto rounded-lg object-cover"
+                />
+              ) : (
+                <div className="w-32 h-32 bg-gray-200 rounded-lg flex items-center justify-center mx-auto">
+                  <span className="text-4xl">📎</span>
+                </div>
+              )}
+            </div>
+
+            {/* Material Info */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Cliente</label>
+                {isEditing ? (
+                  <select
+                    value={formData.client_id}
+                    onChange={(e) => setFormData(prev => ({ ...prev, client_id: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    {clients.map(client => (
+                      <option key={client.id} value={client.id}>
+                        {client.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="text-gray-900">{material.client_name}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Tipo</label>
+                <p className="text-gray-900">{material.type}</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                {isEditing ? (
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="planned">🟡 Planejado</option>
+                    <option value="in_production">🔵 Em Produção</option>
+                    <option value="awaiting_approval">🟠 Aguardando Aprovação</option>
+                    <option value="approved">🟢 Aprovado</option>
+                    <option value="revision_requested">🔴 Revisão Solicitada</option>
+                    <option value="published">⚫ Publicado</option>
+                  </select>
+                ) : (
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(material.status)}`}>
+                    {material.status.replace('_', ' ')}
+                  </span>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Data de Publicação</label>
+                {isEditing ? (
+                  <input
+                    type="datetime-local"
+                    value={formData.scheduled_date}
+                    onChange={(e) => setFormData(prev => ({ ...prev, scheduled_date: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  />
+                ) : (
+                  <p className="text-gray-900">{new Date(material.scheduled_date).toLocaleString()}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Title */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Título</label>
+              {isEditing ? (
+                <input
+                  type="text"
+                  value={formData.title}
+                  onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                />
+              ) : (
+                <p className="text-gray-900">{material.title}</p>
+              )}
+            </div>
+
+            {/* Description */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Legenda</label>
+              {isEditing ? (
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                  rows="4"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                />
+              ) : (
+                <p className="text-gray-900 bg-gray-50 p-3 rounded-md">{material.description}</p>
+              )}
+            </div>
+
+            {/* Tags */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Tags</label>
+              {isEditing ? (
+                <div>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {formData.tags.map((tag, index) => (
+                      <span
+                        key={index}
+                        className="inline-flex items-center px-2 py-1 rounded-full text-sm bg-blue-100 text-blue-800"
+                      >
+                        #{tag}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveTag(tag)}
+                          className="ml-1 text-blue-600 hover:text-blue-800"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <input
+                    type="text"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={handleAddTag}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Digite uma tag e pressione Enter"
+                  />
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {material.tags && material.tags.length > 0 ? (
+                    material.tags.map((tag, index) => (
+                      <span
+                        key={index}
+                        className="inline-flex items-center px-2 py-1 rounded-full text-sm bg-blue-100 text-blue-800"
+                      >
+                        #{tag}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-gray-500">Nenhuma tag</span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Comments */}
+            {material.comments && material.comments.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Comentários do Cliente</label>
+                <div className="space-y-2">
+                  {material.comments.map((comment, index) => (
+                    <div key={index} className="bg-gray-50 p-3 rounded-md">
+                      <p className="text-sm text-gray-900">{comment.text}</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {comment.client_name} • {new Date(comment.timestamp).toLocaleString()}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Submit Buttons */}
+            {isEditing && (
+              <div className="flex justify-end space-x-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsEditing(false)}
+                  className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                >
+                  Salvar Alterações
+                </button>
+              </div>
+            )}
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+};
   const [formData, setFormData] = useState({
     name: '',
     email: '',
