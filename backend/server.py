@@ -839,8 +839,23 @@ async def get_all_documents(current_admin: AdminUser = Depends(get_current_admin
     document_responses = []
     for document in documents:
         client = await db.clients.find_one({"id": document["client_id"]})
-        document_response = DocumentResponse(**document)
-        document_response.client_name = client["name"] if client else "Unknown Client"
+        
+        # Create document response with proper field handling
+        document_data = {
+            "id": document["id"],
+            "client_id": document["client_id"],
+            "client_name": client["name"] if client else "Unknown Client",
+            "name": document["name"],
+            "category": document["category"],
+            "type": document["type"],
+            "size": document["size"],
+            "file_url": document["file_url"],
+            "description": document.get("description"),
+            "visible_to_client": document.get("visible_to_client", True),
+            "upload_date": document["upload_date"]
+        }
+        
+        document_response = DocumentResponse(**document_data)
         document_responses.append(document_response)
     
     return document_responses
