@@ -1415,8 +1415,494 @@ const MaterialPreviewEditModal = ({ material, onClose, onSubmit, clients }) => {
     </div>
   );
 };
-// Create Client Modal
-const CreateClientModal = ({ onClose, onSubmit }) => {
+// Campaign Create/Edit Modal
+const CampaignCreateModal = ({ onClose, onSubmit, clients, campaign = null }) => {
+  const isEditing = !!campaign;
+  const [formData, setFormData] = useState({
+    client_id: campaign?.client_id || '',
+    name: campaign?.name || '',
+    objective: campaign?.objective || 'conversions',
+    platform: campaign?.platform || ['meta'],
+    start_date: campaign?.start_date ? campaign.start_date.split('T')[0] : '',
+    end_date: campaign?.end_date ? campaign.end_date.split('T')[0] : '',
+    daily_budget: campaign?.daily_budget || 0,
+    total_budget: campaign?.total_budget || 0,
+    budget_type: 'total'
+  });
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!formData.client_id || !formData.name || !formData.start_date) {
+      alert('Por favor, preencha todos os campos obrigatórios');
+      return;
+    }
+
+    setSubmitting(true);
+    
+    const campaignData = {
+      ...formData,
+      start_date: new Date(formData.start_date).toISOString(),
+      end_date: formData.end_date ? new Date(formData.end_date).toISOString() : null
+    };
+
+    try {
+      await onSubmit(campaignData);
+    } catch (error) {
+      console.error('Error submitting campaign:', error);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handlePlatformChange = (platform) => {
+    setFormData(prev => ({
+      ...prev,
+      platform: prev.platform.includes(platform)
+        ? prev.platform.filter(p => p !== platform)
+        : [...prev.platform, platform]
+    }));
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-semibold text-gray-900">
+              {isEditing ? 'Editar Campanha' : 'Criar Nova Campanha'}
+            </h2>
+            <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Client Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Cliente *
+              </label>
+              <select
+                value={formData.client_id}
+                onChange={(e) => setFormData(prev => ({ ...prev, client_id: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                required
+              >
+                <option value="">Selecione um cliente</option>
+                {clients.map(client => (
+                  <option key={client.id} value={client.id}>
+                    {client.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Campaign Name */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Nome da Campanha *
+              </label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Ex: Black Friday 2024"
+                required
+              />
+            </div>
+
+            {/* Objective */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Objetivo
+              </label>
+              <div className="grid grid-cols-2 gap-4">
+                {[
+                  { value: 'conversions', label: 'Conversões', icon: '🎯' },
+                  { value: 'traffic', label: 'Tráfego', icon: '🌐' },
+                  { value: 'awareness', label: 'Awareness', icon: '👁️' },
+                  { value: 'leads', label: 'Geração de Leads', icon: '📋' }
+                ].map(objective => (
+                  <label key={objective.value} className="flex items-center cursor-pointer p-3 border rounded-lg hover:bg-gray-50">
+                    <input
+                      type="radio"
+                      name="objective"
+                      value={objective.value}
+                      checked={formData.objective === objective.value}
+                      onChange={(e) => setFormData(prev => ({ ...prev, objective: e.target.value }))}
+                      className="mr-3"
+                    />
+                    <span className="mr-2">{objective.icon}</span>
+                    <span className="text-sm">{objective.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Platforms */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Plataformas (múltipla seleção)
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { value: 'meta', label: 'Meta Ads (Facebook/Instagram)', icon: '📘' },
+                  { value: 'google', label: 'Google Ads', icon: '🔍' },
+                  { value: 'linkedin', label: 'LinkedIn Ads', icon: '💼' },
+                  { value: 'tiktok', label: 'TikTok Ads', icon: '🎵' }
+                ].map(platform => (
+                  <label key={platform.value} className="flex items-center cursor-pointer p-3 border rounded-lg hover:bg-gray-50">
+                    <input
+                      type="checkbox"
+                      checked={formData.platform.includes(platform.value)}
+                      onChange={() => handlePlatformChange(platform.value)}
+                      className="mr-3"
+                    />
+                    <span className="mr-2">{platform.icon}</span>
+                    <span className="text-sm">{platform.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Date Range */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Data de Início *
+                </label>
+                <input
+                  type="date"
+                  value={formData.start_date}
+                  onChange={(e) => setFormData(prev => ({ ...prev, start_date: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Data de Fim
+                </label>
+                <input
+                  type="date"
+                  value={formData.end_date}
+                  onChange={(e) => setFormData(prev => ({ ...prev, end_date: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            </div>
+
+            {/* Budget */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Orçamento
+              </label>
+              <div className="space-y-3">
+                <div className="flex space-x-4">
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      name="budget_type"
+                      value="daily"
+                      checked={formData.budget_type === 'daily'}
+                      onChange={(e) => setFormData(prev => ({ ...prev, budget_type: e.target.value }))}
+                      className="mr-2"
+                    />
+                    <span className="text-sm">Diário</span>
+                  </label>
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      name="budget_type"
+                      value="total"
+                      checked={formData.budget_type === 'total'}
+                      onChange={(e) => setFormData(prev => ({ ...prev, budget_type: e.target.value }))}
+                      className="mr-2"
+                    />
+                    <span className="text-sm">Total</span>
+                  </label>
+                </div>
+                
+                {formData.budget_type === 'daily' ? (
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">Orçamento Diário</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-gray-500">R$</span>
+                      <input
+                        type="number"
+                        value={formData.daily_budget}
+                        onChange={(e) => setFormData(prev => ({ ...prev, daily_budget: parseFloat(e.target.value) || 0 }))}
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="0.00"
+                        step="0.01"
+                        min="0"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">Orçamento Total</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-gray-500">R$</span>
+                      <input
+                        type="number"
+                        value={formData.total_budget}
+                        onChange={(e) => setFormData(prev => ({ ...prev, total_budget: parseFloat(e.target.value) || 0 }))}
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="0.00"
+                        step="0.01"
+                        min="0"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Submit Buttons */}
+            <div className="flex justify-end space-x-3 pt-4">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={submitting}
+                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+              >
+                {submitting ? 'Salvando...' : isEditing ? 'Atualizar' : 'Criar Campanha'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Campaign Details Modal
+const CampaignDetailsModal = ({ campaign, onClose }) => {
+  const [metrics, setMetrics] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchCampaignMetrics();
+  }, [campaign.id]);
+
+  const fetchCampaignMetrics = async () => {
+    try {
+      const response = await axios.get(`/admin/campaigns/${campaign.id}/metrics`);
+      setMetrics(response.data);
+    } catch (error) {
+      console.error('Error fetching campaign metrics:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(value);
+  };
+
+  const formatNumber = (value) => {
+    return new Intl.NumberFormat('pt-BR').format(value);
+  };
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-8 text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p>Carregando métricas...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          {/* Header */}
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">Detalhes - {campaign.name}</h2>
+              <p className="text-gray-600">{campaign.client_name}</p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <button className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">
+                ✏️ Editar
+              </button>
+              <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {metrics && (
+            <>
+              {/* Performance Charts */}
+              <div className="mb-8">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">📊 Gráficos de Performance (últimos 30 dias)</h3>
+                <div className="bg-gray-50 rounded-lg p-6">
+                  <div className="text-center text-gray-500">
+                    <div className="text-6xl mb-4">📈</div>
+                    <p>Gráficos interativos de ROAS, Conversões e CTR</p>
+                    <p className="text-sm mt-2">
+                      ROAS médio: {metrics.summary.roas}x | 
+                      Conversões: {metrics.summary.conversions} | 
+                      CTR: {metrics.summary.ctr}%
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Detailed Metrics */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                {/* Reach and Impressions */}
+                <div className="bg-white border border-gray-200 rounded-lg p-6">
+                  <h4 className="font-medium text-gray-900 mb-4">🎯 Alcance e Impressões</h4>
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">👁️ Impressões:</span>
+                      <span className="font-medium">{formatNumber(metrics.summary.impressions)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">👥 Alcance estimado:</span>
+                      <span className="font-medium">{formatNumber(Math.floor(metrics.summary.impressions * 0.7))}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">🔄 Frequência:</span>
+                      <span className="font-medium">2.7</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">💰 CPM:</span>
+                      <span className="font-medium">{formatCurrency(metrics.summary.cpm)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Engagement */}
+                <div className="bg-white border border-gray-200 rounded-lg p-6">
+                  <h4 className="font-medium text-gray-900 mb-4">👆 Engajamento</h4>
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">👆 Cliques:</span>
+                      <span className="font-medium">{formatNumber(metrics.summary.clicks)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">📊 CTR:</span>
+                      <div className="flex items-center">
+                        <span className="font-medium">{metrics.summary.ctr}%</span>
+                        {metrics.summary.ctr > 2.1 ? (
+                          <span className="ml-1 text-green-600">✅</span>
+                        ) : (
+                          <span className="ml-1 text-yellow-600">⚠️</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">💲 CPC:</span>
+                      <div className="flex items-center">
+                        <span className="font-medium">{formatCurrency(metrics.summary.cpc)}</span>
+                        {metrics.summary.cpc < 0.50 ? (
+                          <span className="ml-1 text-green-600">✅</span>
+                        ) : (
+                          <span className="ml-1 text-red-600">❌</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">📈 Taxa de conversão:</span>
+                      <span className="font-medium">{metrics.summary.conversion_rate}%</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Conversions and ROI */}
+                <div className="bg-white border border-gray-200 rounded-lg p-6">
+                  <h4 className="font-medium text-gray-900 mb-4">💎 Conversões e ROI</h4>
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">🎯 Conversões:</span>
+                      <span className="font-medium">{metrics.summary.conversions}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">💰 Custo por Conversão:</span>
+                      <span className="font-medium">{formatCurrency(metrics.summary.cost_per_conversion)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">💎 ROAS:</span>
+                      <div className="flex items-center">
+                        <span className="font-medium">{metrics.summary.roas}x</span>
+                        {metrics.summary.roas >= 4.0 ? (
+                          <span className="ml-1 text-green-600">✅</span>
+                        ) : (
+                          <span className="ml-1 text-red-600">❌</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">💵 Receita Total:</span>
+                      <span className="font-medium">{formatCurrency(metrics.summary.revenue)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Historical Changes */}
+              <div className="mb-6">
+                <h4 className="font-medium text-gray-900 mb-4">🕒 Histórico de Mudanças</h4>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center">
+                      <span className="text-gray-500 mr-2">20/11</span>
+                      <span>Orçamento aumentado para R$ 150/dia</span>
+                    </div>
+                    <div className="flex items-center">
+                      <span className="text-gray-500 mr-2">18/11</span>
+                      <span>Pausado público 25-34 (baixo ROAS)</span>
+                    </div>
+                    <div className="flex items-center">
+                      <span className="text-gray-500 mr-2">16/11</span>
+                      <span>Ativado lookalike de compradores</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end space-x-3">
+                <button className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
+                  📥 Exportar Dados
+                </button>
+                <button className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                  📧 Enviar Relatório
+                </button>
+                <button onClick={onClose} className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700">
+                  Fechar
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
   const [formData, setFormData] = useState({
     name: '',
     email: '',
