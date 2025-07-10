@@ -1990,37 +1990,574 @@ const AdminMaterialsPage = ({ materials, clients, onRefresh }) => {
   );
 };
 
-const AdminCampaignsPage = ({ campaigns, clients }) => {
+const AdminCampaignsPage = ({ campaigns, clients, onRefresh }) => {
+  const { addToast } = React.useContext(ToastContext);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [selectedCampaign, setSelectedCampaign] = useState(null);
+  const [filters, setFilters] = useState({
+    client: 'all',
+    status: 'all',
+    platform: 'all',
+    search: ''
+  });
+  const [allCampaigns, setAllCampaigns] = useState(campaigns);
+  const [campaignStats, setCampaignStats] = useState(null);
+  const [campaignAlerts, setCampaignAlerts] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setAllCampaigns(campaigns);
+    fetchCampaignStats();
+    fetchCampaignAlerts();
+  }, [campaigns]);
+
+  const fetchCampaignStats = async () => {
+    try {
+      const response = await axios.get('/admin/campaigns/stats');
+      setCampaignStats(response.data);
+    } catch (error) {
+      console.error('Error fetching campaign stats:', error);
+    }
+  };
+
+  const fetchCampaignAlerts = async () => {
+    try {
+      const response = await axios.get('/admin/campaigns/alerts');
+      setCampaignAlerts(response.data);
+    } catch (error) {
+      console.error('Error fetching campaign alerts:', error);
+    }
+  };
+
+  const handleCreateCampaign = async (campaignData) => {
+    try {
+      setLoading(true);
+      await axios.post('/admin/campaigns', campaignData);
+      addToast('Campanha criada com sucesso! 🚀');
+      setShowCreateModal(false);
+      onRefresh();
+    } catch (error) {
+      console.error('Error creating campaign:', error);
+      addToast('Erro ao criar campanha', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateCampaign = async (campaignId, updateData) => {
+    try {
+      setLoading(true);
+      await axios.put(`/admin/campaigns/${campaignId}`, updateData);
+      addToast('Campanha atualizada com sucesso! 📊');
+      onRefresh();
+    } catch (error) {
+      console.error('Error updating campaign:', error);
+      addToast('Erro ao atualizar campanha', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteCampaign = async (campaignId) => {
+    if (!confirm('Tem certeza que deseja excluir esta campanha?')) return;
+    
+    try {
+      setLoading(true);
+      await axios.delete(`/admin/campaigns/${campaignId}`);
+      addToast('Campanha excluída com sucesso! 🗑️');
+      onRefresh();
+    } catch (error) {
+      console.error('Error deleting campaign:', error);
+      addToast('Erro ao excluir campanha', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSyncMetrics = async (campaignId) => {
+    try {
+      setLoading(true);
+      await axios.post(`/admin/campaigns/${campaignId}/sync-metrics`);
+      addToast('Métricas sincronizadas com sucesso! 🔄');
+      onRefresh();
+    } catch (error) {
+      console.error('Error syncing metrics:', error);
+      addToast('Erro ao sincronizar métricas', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFilterChange = (key, value) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  const filteredCampaigns = allCampaigns.filter(campaign => {
+    if (filters.client !== 'all' && campaign.client_id !== filters.client) return false;
+    if (filters.status !== 'all' && campaign.status !== filters.status) return false;
+    if (filters.platform !== 'all' && !campaign.platform.includes(filters.platform)) return false;
+    if (filters.search && !campaign.name.toLowerCase().includes(filters.search.toLowerCase()) && 
+        !campaign.objective.toLowerCase().includes(filters.search.toLowerCase())) return false;
+    return true;
+  });
+
+  const getStatusColor = (status) => {
+    const colors = {
+      active: 'bg-green-100 text-green-800',
+      paused: 'bg-yellow-100 text-yellow-800',
+      completed: 'bg-gray-100 text-gray-800',
+      suspended: 'bg-red-100 text-red-800'
+    };
+    return colors[status] || 'bg-gray-100 text-gray-800';
+  };
+
+  const getStatusIcon = (status) => {
+    const icons = {
+      active: '🟢',
+      paused: '🟡',
+      completed: '⚫',
+      suspended: '🔴'
+    };
+    return icons[status] || '⚪';
+  };
+
+  const getPlatformIcon = (platform) => {
+    const icons = {
+      meta: '📘',
+      google: '🔍',
+      linkedin: '💼',
+      tiktok: '🎵'
+    };
+    return icons[platform] || '📊';
+  };
+
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(value);
+  };
+
+  const formatNumber = (value) => {
+    return new Intl.NumberFormat('pt-BR').format(value);
+  };
+
   return (
     <div className="p-8">
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">Gestão de Campanhas</h1>
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <p className="text-gray-600">Total de {campaigns.length} campanhas</p>
-        <div className="mt-4 space-y-4">
-          {campaigns.map(campaign => (
-            <div key={campaign.id} className="border rounded-lg p-4">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-medium">{campaign.name}</h3>
-                  <p className="text-gray-500">{campaign.client_name}</p>
-                  <div className="mt-2 grid grid-cols-4 gap-4 text-sm">
-                    <span>CTR: {campaign.ctr}%</span>
-                    <span>CPC: R$ {campaign.cpc.toFixed(2)}</span>
-                    <span>Impressões: {campaign.impressions.toLocaleString()}</span>
-                    <span>Gasto: R$ {campaign.spend.toFixed(2)}</span>
-                  </div>
+      {/* Header */}
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Gestão de Campanhas</h1>
+          <p className="mt-2 text-gray-600">Monitore performance e gerencie campanhas de marketing digital</p>
+        </div>
+        <div className="flex space-x-3">
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center"
+          >
+            <span className="mr-2">🚀</span>
+            Nova Campanha
+          </button>
+          <button className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 flex items-center">
+            <span className="mr-2">📊</span>
+            Relatório Geral
+          </button>
+        </div>
+      </div>
+
+      {/* Stats Overview */}
+      {campaignStats && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center">
+                  <span className="text-white text-sm">🎯</span>
                 </div>
-                <span className={`px-2 py-1 rounded text-xs ${
-                  campaign.status === 'active' ? 'bg-green-100 text-green-800' :
-                  'bg-gray-100 text-gray-800'
-                }`}>
-                  {campaign.status}
-                </span>
+              </div>
+              <div className="ml-4">
+                <div className="text-sm font-medium text-gray-500">Campanhas Ativas</div>
+                <div className="text-2xl font-bold text-gray-900">{campaignStats.active_campaigns}</div>
+                <div className="text-xs text-gray-500">
+                  {campaignStats.paused_campaigns} pausadas
+                </div>
               </div>
             </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+                  <span className="text-white text-sm">💰</span>
+                </div>
+              </div>
+              <div className="ml-4">
+                <div className="text-sm font-medium text-gray-500">Gasto Total</div>
+                <div className="text-2xl font-bold text-gray-900">
+                  {formatCurrency(campaignStats.total_spend)}
+                </div>
+                <div className="text-xs text-gray-500">
+                  {campaignStats.budget_utilization?.toFixed(0)}% do orçamento
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center">
+                  <span className="text-white text-sm">📈</span>
+                </div>
+              </div>
+              <div className="ml-4">
+                <div className="text-sm font-medium text-gray-500">ROAS Médio</div>
+                <div className="text-2xl font-bold text-gray-900">
+                  {campaignStats.avg_roas?.toFixed(1)}x
+                </div>
+                <div className="text-xs text-gray-500">
+                  {campaignStats.total_conversions} conversões
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Alerts */}
+      {campaignAlerts.length > 0 && (
+        <div className="mb-8">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Alertas de Performance</h3>
+          <div className="space-y-3">
+            {campaignAlerts.slice(0, 3).map((alert) => (
+              <div
+                key={alert.id}
+                className={`p-4 rounded-lg border ${
+                  alert.type === 'critical' ? 'bg-red-50 border-red-200' :
+                  alert.type === 'warning' ? 'bg-yellow-50 border-yellow-200' :
+                  'bg-green-50 border-green-200'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <span className="text-lg mr-3">
+                      {alert.type === 'critical' ? '🔴' : alert.type === 'warning' ? '🟡' : '🟢'}
+                    </span>
+                    <div>
+                      <span className="font-medium">
+                        {alert.type === 'critical' ? 'URGENTE' : 
+                         alert.type === 'warning' ? 'ATENÇÃO' : 'SUCESSO'}
+                      </span>
+                      <span className="mx-2">-</span>
+                      <span>{alert.campaign_name}</span>
+                      <span className="text-gray-600 ml-2">({alert.client_name})</span>
+                    </div>
+                  </div>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => {
+                        const campaign = allCampaigns.find(c => c.id === alert.campaign_id);
+                        if (campaign) {
+                          setSelectedCampaign(campaign);
+                          setShowDetailsModal(true);
+                        }
+                      }}
+                      className="text-blue-600 hover:text-blue-800 text-sm"
+                    >
+                      Ver Detalhes
+                    </button>
+                  </div>
+                </div>
+                <p className="text-sm mt-1 ml-8">{alert.message}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+        <div className="flex flex-wrap gap-4 mb-4">
+          <div className="min-w-[200px]">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Cliente</label>
+            <select
+              value={filters.client}
+              onChange={(e) => handleFilterChange('client', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="all">Todos os Clientes</option>
+              {clients.map(client => (
+                <option key={client.id} value={client.id}>
+                  {client.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="min-w-[150px]">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <select
+              value={filters.status}
+              onChange={(e) => handleFilterChange('status', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="all">Todos</option>
+              <option value="active">🟢 Ativas</option>
+              <option value="paused">🟡 Pausadas</option>
+              <option value="completed">⚫ Finalizadas</option>
+              <option value="suspended">🔴 Suspensas</option>
+            </select>
+          </div>
+
+          <div className="min-w-[150px]">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Plataforma</label>
+            <select
+              value={filters.platform}
+              onChange={(e) => handleFilterChange('platform', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="all">Todas</option>
+              <option value="meta">📘 Meta Ads</option>
+              <option value="google">🔍 Google Ads</option>
+              <option value="linkedin">💼 LinkedIn</option>
+              <option value="tiktok">🎵 TikTok</option>
+            </select>
+          </div>
+
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Buscar por nome da campanha..."
+                value={filters.search}
+                onChange={(e) => handleFilterChange('search', e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              />
+              <svg className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Status Filters */}
+        <div className="flex flex-wrap gap-2">
+          <span className="text-sm text-gray-500 mr-2">Filtros rápidos:</span>
+          {[
+            { key: 'all', label: 'Todas', icon: '📊' },
+            { key: 'active', label: 'Ativas', icon: '🟢' },
+            { key: 'paused', label: 'Pausadas', icon: '🟡' },
+            { key: 'completed', label: 'Finalizadas', icon: '⚫' }
+          ].map(filter => (
+            <button
+              key={filter.key}
+              onClick={() => handleFilterChange('status', filter.key)}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                filters.status === filter.key
+                  ? 'bg-blue-100 text-blue-800'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {filter.icon} {filter.label}
+            </button>
           ))}
         </div>
       </div>
+
+      {/* Campaigns List */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="p-6 border-b border-gray-200">
+          <h3 className="text-lg font-medium text-gray-900">
+            Campanhas ({filteredCampaigns.length})
+          </h3>
+        </div>
+
+        <div className="p-6">
+          {loading ? (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+              <p className="mt-2 text-gray-600">Carregando campanhas...</p>
+            </div>
+          ) : filteredCampaigns.length === 0 ? (
+            <div className="text-center py-8">
+              <div className="w-24 h-24 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+                <span className="text-4xl">🎯</span>
+              </div>
+              <p className="text-gray-500">Nenhuma campanha encontrada para este filtro</p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {filteredCampaigns.map((campaign) => {
+                const budgetUtilization = (campaign.spend / campaign.total_budget) * 100;
+                const revenue = campaign.conversions * 150; // Estimated avg order value
+                const roas = revenue / campaign.spend;
+
+                return (
+                  <div key={campaign.id} className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
+                    {/* Campaign Header */}
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 mr-4">
+                          <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <span className="text-blue-600 text-xl">🎯</span>
+                          </div>
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-900">{campaign.name}</h3>
+                          <p className="text-sm text-gray-600">{campaign.client_name}</p>
+                          <div className="flex items-center mt-1 space-x-4 text-sm text-gray-500">
+                            <span>📅 {new Date(campaign.start_date).toLocaleDateString()}</span>
+                            {campaign.end_date && (
+                              <span>- {new Date(campaign.end_date).toLocaleDateString()}</span>
+                            )}
+                            <span>
+                              {campaign.platform.map(p => getPlatformIcon(p)).join(' ')} {campaign.platform.join(', ')}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(campaign.status)}`}>
+                          {getStatusIcon(campaign.status)} {campaign.status.toUpperCase()}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Budget Info */}
+                    <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm font-medium text-gray-700">Orçamento</span>
+                        <span className="text-sm text-gray-600">
+                          {formatCurrency(campaign.spend)} / {formatCurrency(campaign.total_budget)} ({budgetUtilization.toFixed(0)}%)
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className={`h-2 rounded-full ${
+                            budgetUtilization > 90 ? 'bg-red-500' :
+                            budgetUtilization > 70 ? 'bg-yellow-500' : 'bg-green-500'
+                          }`}
+                          style={{ width: `${Math.min(budgetUtilization, 100)}%` }}
+                        ></div>
+                      </div>
+                    </div>
+
+                    {/* Metrics Grid */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 p-4 border border-gray-200 rounded-lg">
+                      <div className="text-center">
+                        <div className="text-xs text-gray-500 mb-1">👁️ Impressões</div>
+                        <div className="font-semibold text-gray-900">{formatNumber(campaign.impressions)}</div>
+                        <div className="text-xs text-gray-600">CPM: {formatCurrency(campaign.impressions > 0 ? (campaign.spend / campaign.impressions) * 1000 : 0)}</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xs text-gray-500 mb-1">👆 Cliques</div>
+                        <div className="font-semibold text-gray-900">{formatNumber(campaign.clicks)}</div>
+                        <div className="text-xs text-gray-600">CPC: {formatCurrency(campaign.cpc)}</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xs text-gray-500 mb-1">📊 CTR</div>
+                        <div className="font-semibold text-gray-900">{campaign.ctr}%</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xs text-gray-500 mb-1">🎯 Conversões</div>
+                        <div className="font-semibold text-gray-900">{campaign.conversions}</div>
+                        <div className="text-xs text-gray-600">ROAS: {roas.toFixed(1)}x</div>
+                      </div>
+                    </div>
+
+                    {/* Last Update */}
+                    <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
+                      <span>📈 Última atualização: 2h atrás</span>
+                      {campaign.status === 'paused' && (
+                        <span className="text-yellow-600">⚠️ Pausada há 3 dias</span>
+                      )}
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => {
+                          setSelectedCampaign(campaign);
+                          setShowDetailsModal(true);
+                        }}
+                        className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                      >
+                        📊 Ver Detalhes
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedCampaign(campaign);
+                          setShowCreateModal(true);
+                        }}
+                        className="px-3 py-1 bg-gray-600 text-white rounded text-sm hover:bg-gray-700"
+                      >
+                        ✏️ Editar
+                      </button>
+                      <button className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700">
+                        📋 Relatório
+                      </button>
+                      {campaign.status === 'active' ? (
+                        <button
+                          onClick={() => handleUpdateCampaign(campaign.id, { status: 'paused' })}
+                          className="px-3 py-1 bg-yellow-600 text-white rounded text-sm hover:bg-yellow-700"
+                        >
+                          ⏸️ Pausar
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleUpdateCampaign(campaign.id, { status: 'active' })}
+                          className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+                        >
+                          ▶️ Reativar
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleSyncMetrics(campaign.id)}
+                        className="px-3 py-1 bg-purple-600 text-white rounded text-sm hover:bg-purple-700"
+                      >
+                        🔄 Atualizar Métricas
+                      </button>
+                      <button
+                        onClick={() => handleDeleteCampaign(campaign.id)}
+                        className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+                      >
+                        🗑️ Arquivar
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Create Campaign Modal */}
+      {showCreateModal && (
+        <CampaignCreateModal
+          onClose={() => {
+            setShowCreateModal(false);
+            setSelectedCampaign(null);
+          }}
+          onSubmit={handleCreateCampaign}
+          clients={clients}
+          campaign={selectedCampaign} // For editing
+        />
+      )}
+
+      {/* Campaign Details Modal */}
+      {showDetailsModal && selectedCampaign && (
+        <CampaignDetailsModal
+          campaign={selectedCampaign}
+          onClose={() => {
+            setShowDetailsModal(false);
+            setSelectedCampaign(null);
+          }}
+        />
+      )}
     </div>
   );
 };
