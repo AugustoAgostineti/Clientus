@@ -953,28 +953,178 @@ async def create_campaign_admin(campaign_data: CampaignCreate, current_admin: Ad
     # Return campaign with client name
     ctr = 0.0
     cpc = 0.0
+@api_router.put("/admin/campaigns/{campaign_id}", response_model=CampaignResponse)
+async def update_campaign_admin(campaign_id: str, campaign_data: CampaignUpdate, current_admin: AdminUser = Depends(get_current_admin)):
+    campaign = await db.campaigns.find_one({"id": campaign_id})
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    
+    update_data = {k: v for k, v in campaign_data.dict().items() if v is not None}
+    
+    if update_data:
+        await db.campaigns.update_one(
+            {"id": campaign_id},
+            {"$set": update_data}
+        )
+    
+    updated_campaign = await db.campaigns.find_one({"id": campaign_id})
+    client = await db.clients.find_one({"id": updated_campaign["client_id"]})
+    
+    ctr = (updated_campaign["clicks"] / updated_campaign["impressions"]) * 100 if updated_campaign["impressions"] > 0 else 0
+    cpc = updated_campaign["spend"] / updated_campaign["clicks"] if updated_campaign["clicks"] > 0 else 0
+    
     campaign_response = CampaignResponse(
-        id=campaign.id,
-        client_id=campaign.client_id,
-        client_name=client["name"],
-        name=campaign.name,
-        objective=campaign.objective,
-        platform=campaign.platform,
-        status=campaign.status,
-        daily_budget=campaign.daily_budget,
-        total_budget=campaign.total_budget,
-        start_date=campaign.start_date,
-        end_date=campaign.end_date,
-        impressions=0,
-        clicks=0,
-        conversions=0,
-        spend=0.0,
-        ctr=ctr,
-        cpc=cpc,
-        created_at=campaign.created_at
+        id=updated_campaign["id"],
+        client_id=updated_campaign["client_id"],
+        client_name=client["name"] if client else "Unknown Client",
+        name=updated_campaign["name"],
+        objective=updated_campaign.get("objective", "conversions"),
+        platform=updated_campaign.get("platform", ["meta"]),
+        status=updated_campaign["status"],
+        daily_budget=updated_campaign.get("daily_budget", 0.0),
+        total_budget=updated_campaign.get("total_budget", 0.0),
+        start_date=updated_campaign.get("start_date", updated_campaign["created_at"]),
+        end_date=updated_campaign.get("end_date"),
+        impressions=updated_campaign["impressions"],
+        clicks=updated_campaign["clicks"],
+        conversions=updated_campaign["conversions"],
+        spend=updated_campaign["spend"],
+        ctr=round(ctr, 2),
+        cpc=round(cpc, 2),
+        created_at=updated_campaign["created_at"]
     )
     
     return campaign_response
+
+@api_router.delete("/admin/campaigns/{campaign_id}")
+async def delete_campaign_admin(campaign_id: str, current_admin: AdminUser = Depends(get_current_admin)):
+    campaign = await db.campaigns.find_one({"id": campaign_id})
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    
+    await db.campaigns.delete_one({"id": campaign_id})
+    return {"message": "Campaign deleted successfully"}
+
+@api_router.get("/admin/campaigns/stats")
+async def get_campaigns_stats(current_admin: AdminUser = Depends(get_current_admin)):
+    # Get aggregated campaign statistics
+    active_campaigns = await db.campaigns.count_documents({"status": "active"})
+    paused_campaigns = await db.campaigns.count_documents({"status": "paused"})
+    total_campaigns = await db.campaigns.count_documents({})
+    
+    # Calculate total spend and revenue
+    pipeline = [
+        {"$group": {
+            "_id": None,
+            "total_spend": {"$sum": "$spend"},
+            "total_budget": {"$sum": "$total_budget"},
+            "total_conversions": {"$sum": "$conversions"},
+            "campaigns": {"$sum": 1}
+        }}
+    ]
+    
+    aggregation = await db.campaigns.aggregate(pipeline).to_list(1)
+    stats = aggregation[0] if aggregation else {
+        "total_spend": 0,
+        "total_budget": 0,
+        "total_conversions": 0,
+        "campaigns": 0
+    }
+    
+    # Calculate average ROAS
+    roas_pipeline = [
+        {"$match": {"spend": {"$gt": 0}}},
+        {"$addFields": {
+            "revenue": {"$multiply": ["$conversions", 150]},  # Assuming avg order value of R$ 150
+            "roas": {"$divide": [{"$multiply": ["$conversions", 150]}, "$spend"]}
+        }},
+        {"$group": {
+            "_id": None,
+            "avg_roas": {"$avg": "$roas"},
+            "total_revenue": {"$sum": "$revenue"}
+        }}
+    ]
+    
+    roas_agg = await db.campaigns.aggregate(roas_pipeline).to_list(1)
+    roas_data = roas_agg[0] if roas_agg else {"avg_roas": 0, "total_revenue": 0}
+    
+    return {
+        "active_campaigns": active_campaigns,
+        "paused_campaigns": paused_campaigns,
+        "total_campaigns": total_campaigns,
+        "total_spend": stats["total_spend"],
+        "total_budget": stats["total_budget"],
+        "budget_utilization": (stats["total_spend"] / stats["total_budget"]) * 100 if stats["total_budget"] > 0 else 0,
+        "total_conversions": stats["total_conversions"],
+        "avg_roas": round(roas_data["avg_roas"], 2) if roas_data["avg_roas"] else 0,
+        "total_revenue": roas_data["total_revenue"]
+    }
+
+@api_router.get("/admin/campaigns/alerts")
+async def get_campaign_alerts(current_admin: AdminUser = Depends(get_current_admin)):
+    alerts = []
+    
+    # Get campaigns with potential issues
+    campaigns = await db.campaigns.find({"status": "active"}).to_list(1000)
+    
+    for campaign in campaigns:
+        client = await db.clients.find_one({"id": campaign["client_id"]})
+        client_name = client["name"] if client else "Unknown Client"
+        
+        # Calculate metrics
+        spend = campaign.get("spend", 0)
+        budget = campaign.get("total_budget", 0)
+        conversions = campaign.get("conversions", 0)
+        
+        # Revenue estimation (assuming avg order value of R$ 150)
+        revenue = conversions * 150
+        roas = revenue / spend if spend > 0 else 0
+        budget_utilization = (spend / budget) * 100 if budget > 0 else 0
+        
+        # Alert conditions
+        if roas < 2.0 and spend > 100:  # Low ROAS
+            alerts.append({
+                "id": f"roas_{campaign['id']}",
+                "type": "critical",
+                "campaign_id": campaign["id"],
+                "campaign_name": campaign["name"],
+                "client_name": client_name,
+                "message": f"ROAS abaixo da meta ({roas:.1f}x vs meta 2.5x)",
+                "metric": "roas",
+                "current_value": roas,
+                "target_value": 2.5,
+                "actions": ["pause", "adjust_targeting", "increase_budget"]
+            })
+        
+        if budget_utilization > 90:  # Budget almost exhausted
+            alerts.append({
+                "id": f"budget_{campaign['id']}",
+                "type": "warning",
+                "campaign_id": campaign["id"],
+                "campaign_name": campaign["name"],
+                "client_name": client_name,
+                "message": f"Orçamento {budget_utilization:.0f}% consumido",
+                "metric": "budget",
+                "current_value": budget_utilization,
+                "target_value": 100,
+                "actions": ["increase_budget", "extend_period"]
+            })
+        
+        if roas > 5.0 and conversions > 10:  # High performance
+            alerts.append({
+                "id": f"success_{campaign['id']}",
+                "type": "success",
+                "campaign_id": campaign["id"],
+                "campaign_name": campaign["name"],
+                "client_name": client_name,
+                "message": f"ROAS excelente - {roas:.1f}x!",
+                "metric": "roas",
+                "current_value": roas,
+                "target_value": 4.0,
+                "actions": ["scale_budget", "duplicate_campaign"]
+            })
+    
+    return sorted(alerts, key=lambda x: {"critical": 0, "warning": 1, "success": 2}[x["type"]])
 
 @api_router.get("/admin/documents", response_model=List[DocumentResponse])
 async def get_all_documents(current_admin: AdminUser = Depends(get_current_admin)):
