@@ -3293,6 +3293,29 @@ const ClientApp = () => {
     }
   };
 
+  const handleRequestMaterial = async (materialData) => {
+    try {
+      await axios.post('/client/material-requests', materialData);
+      addToast('✅ Solicitação enviada com sucesso!', 'success');
+      setShowRequestMaterialModal(false);
+      fetchData();
+    } catch (error) {
+      console.error('Error requesting material:', error);
+      addToast('Erro ao enviar solicitação', 'error');
+    }
+  };
+
+  const handleSupportSubmit = async (supportData) => {
+    try {
+      await axios.post('/client/support/tickets', supportData);
+      addToast('✅ Mensagem enviada com sucesso!', 'success');
+      setShowSupportModal(false);
+    } catch (error) {
+      console.error('Error sending support message:', error);
+      addToast('Erro ao enviar mensagem', 'error');
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
