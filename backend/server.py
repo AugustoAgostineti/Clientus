@@ -635,6 +635,136 @@ async def download_document(document_id: str, current_client: Client = Depends(g
     
     return {"download_url": document["file_url"]}
 
+# =================== CLIENT MATERIAL REQUESTS ===================
+
+@api_router.post("/client/material-requests", response_model=MaterialRequestResponse)
+async def create_material_request(
+    request: MaterialRequestCreate,
+    current_client: Client = Depends(get_current_client)
+):
+    # Convert deadline string to datetime
+    try:
+        deadline = datetime.fromisoformat(request.deadline.replace('Z', '+00:00'))
+    except ValueError:
+        deadline = datetime.strptime(request.deadline, "%Y-%m-%d")
+    
+    material_request = MaterialRequest(
+        client_id=current_client.id,
+        platforms=request.platforms,
+        briefing=request.briefing,
+        deadline=deadline,
+        priority=request.priority,
+        other_platform=request.other_platform,
+        files=request.files
+    )
+    
+    await db.material_requests.insert_one(material_request.dict())
+    
+    return MaterialRequestResponse(
+        **material_request.dict(),
+        client_name=current_client.name
+    )
+
+@api_router.get("/client/material-requests", response_model=List[MaterialRequestResponse])
+async def get_client_material_requests(current_client: Client = Depends(get_current_client)):
+    requests = await db.material_requests.find({"client_id": current_client.id}).to_list(1000)
+    return [MaterialRequestResponse(**req, client_name=current_client.name) for req in requests]
+
+@api_router.get("/client/material-requests/{request_id}", response_model=MaterialRequestResponse)
+async def get_material_request(request_id: str, current_client: Client = Depends(get_current_client)):
+    request = await db.material_requests.find_one({"id": request_id, "client_id": current_client.id})
+    if not request:
+        raise HTTPException(status_code=404, detail="Material request not found")
+    
+    return MaterialRequestResponse(**request, client_name=current_client.name)
+
+# =================== CLIENT DOCUMENTS ===================
+
+@api_router.get("/client/documents", response_model=List[DocumentResponse])
+async def get_client_documents(current_client: Client = Depends(get_current_client)):
+    documents = await db.documents.find({"client_id": current_client.id, "visible_to_client": True}).to_list(1000)
+    
+    # Add is_new field (documents created in last 7 days)
+    seven_days_ago = datetime.utcnow() - timedelta(days=7)
+    
+    document_responses = []
+    for doc in documents:
+        doc_response = DocumentResponse(**doc)
+        doc_response.is_new = doc["upload_date"] > seven_days_ago
+        document_responses.append(doc_response)
+    
+    return document_responses
+
+@api_router.get("/client/documents/search")
+async def search_client_documents(
+    q: str = "",
+    current_client: Client = Depends(get_current_client)
+):
+    if not q:
+        return await get_client_documents(current_client)
+    
+    documents = await db.documents.find({
+        "client_id": current_client.id,
+        "visible_to_client": True,
+        "name": {"$regex": q, "$options": "i"}
+    }).to_list(1000)
+    
+    # Add is_new field
+    seven_days_ago = datetime.utcnow() - timedelta(days=7)
+    
+    document_responses = []
+    for doc in documents:
+        doc_response = DocumentResponse(**doc)
+        doc_response.is_new = doc["upload_date"] > seven_days_ago
+        document_responses.append(doc_response)
+    
+    return document_responses
+
+@api_router.get("/client/documents/download/{document_id}")
+async def download_client_document(document_id: str, current_client: Client = Depends(get_current_client)):
+    document = await db.documents.find_one({"id": document_id, "client_id": current_client.id, "visible_to_client": True})
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    # Return file data - in a real application, this would be a proper file download
+    return {"download_url": document["file_url"]}
+
+# =================== CLIENT SUPPORT TICKETS ===================
+
+@api_router.post("/client/support/tickets", response_model=SupportTicketResponse)
+async def create_support_ticket(
+    ticket: SupportTicketCreate,
+    current_client: Client = Depends(get_current_client)
+):
+    support_ticket = SupportTicket(
+        client_id=current_client.id,
+        subject=ticket.subject,
+        message=ticket.message,
+        priority=ticket.priority,
+        response_channels=ticket.response_channels,
+        files=ticket.files
+    )
+    
+    await db.support_tickets.insert_one(support_ticket.dict())
+    
+    return SupportTicketResponse(
+        **support_ticket.dict(),
+        client_name=current_client.name
+    )
+
+@api_router.get("/client/support/tickets", response_model=List[SupportTicketResponse])
+async def get_client_support_tickets(current_client: Client = Depends(get_current_client)):
+    tickets = await db.support_tickets.find({"client_id": current_client.id}).to_list(1000)
+    return [SupportTicketResponse(**ticket, client_name=current_client.name) for ticket in tickets]
+
+@api_router.get("/client/support/tickets/{ticket_id}", response_model=SupportTicketResponse)
+async def get_support_ticket(ticket_id: str, current_client: Client = Depends(get_current_client)):
+    ticket = await db.support_tickets.find_one({"id": ticket_id, "client_id": current_client.id})
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Support ticket not found")
+    
+    return SupportTicketResponse(**ticket, client_name=current_client.name)
+
 # =================== ADMIN ROUTES (NEW) ===================
 
 @api_router.post("/admin/auth/login", response_model=Token)
