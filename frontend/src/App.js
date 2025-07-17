@@ -3238,6 +3238,9 @@ const ClientApp = () => {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [selectedMaterial, setSelectedMaterial] = useState(null);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [showRequestMaterialModal, setShowRequestMaterialModal] = useState(false);
+  const [showDocumentsModal, setShowDocumentsModal] = useState(false);
+  const [showSupportModal, setShowSupportModal] = useState(false);
 
   useEffect(() => {
     fetchData();
