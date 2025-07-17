@@ -3490,6 +3490,811 @@ const ClientApp = () => {
   );
 };
 
+// Request Material Modal Component
+const RequestMaterialModal = ({ isOpen, onClose, onSubmit }) => {
+  const [formData, setFormData] = useState({
+    platforms: [],
+    briefing: '',
+    deadline: '',
+    priority: 'normal',
+    otherPlatform: ''
+  });
+  const [files, setFiles] = useState([]);
+  const [dragOver, setDragOver] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  const platformOptions = [
+    { id: 'instagram_feed', label: 'Instagram Feed' },
+    { id: 'instagram_stories', label: 'Instagram Stories' },
+    { id: 'instagram_reels', label: 'Instagram Reels' },
+    { id: 'facebook_post', label: 'Facebook Post' },
+    { id: 'facebook_stories', label: 'Facebook Stories' },
+    { id: 'linkedin', label: 'LinkedIn' },
+    { id: 'tiktok', label: 'TikTok' },
+    { id: 'youtube', label: 'YouTube' },
+    { id: 'outros', label: 'Outros' }
+  ];
+
+  const handlePlatformChange = (platformId, checked) => {
+    if (checked) {
+      setFormData(prev => ({
+        ...prev,
+        platforms: [...prev.platforms, platformId]
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        platforms: prev.platforms.filter(p => p !== platformId)
+      }));
+    }
+  };
+
+  const handleFileUpload = (event) => {
+    const newFiles = Array.from(event.target.files);
+    if (files.length + newFiles.length > 5) {
+      alert('Máximo de 5 arquivos permitido');
+      return;
+    }
+    
+    const validFiles = newFiles.filter(file => {
+      const validTypes = ['image/jpeg', 'image/png', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+      const maxSize = 10 * 1024 * 1024; // 10MB
+      
+      if (!validTypes.includes(file.type)) {
+        alert(`Arquivo ${file.name} não é suportado`);
+        return false;
+      }
+      
+      if (file.size > maxSize) {
+        alert(`Arquivo ${file.name} é muito grande (máximo 10MB)`);
+        return false;
+      }
+      
+      return true;
+    });
+    
+    setFiles(prev => [...prev, ...validFiles]);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setDragOver(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    const droppedFiles = Array.from(e.dataTransfer.files);
+    handleFileUpload({ target: { files: droppedFiles } });
+  };
+
+  const removeFile = (index) => {
+    setFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    // Validations
+    if (formData.platforms.length === 0) {
+      alert('Selecione pelo menos uma plataforma');
+      return;
+    }
+    
+    if (formData.briefing.length < 50) {
+      alert('Briefing deve ter pelo menos 50 caracteres');
+      return;
+    }
+    
+    if (!formData.deadline) {
+      alert('Selecione um prazo');
+      return;
+    }
+    
+    const selectedDate = new Date(formData.deadline);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (selectedDate < today) {
+      alert('Prazo não pode ser anterior a hoje');
+      return;
+    }
+
+    setUploading(true);
+    
+    try {
+      // Process files to base64
+      const processedFiles = await Promise.all(
+        files.map(async (file) => {
+          return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              resolve({
+                name: file.name,
+                type: file.type,
+                size: file.size,
+                data: e.target.result
+              });
+            };
+            reader.readAsDataURL(file);
+          });
+        })
+      );
+
+      const requestData = {
+        platforms: formData.platforms,
+        briefing: formData.briefing,
+        deadline: formData.deadline,
+        priority: formData.priority,
+        otherPlatform: formData.otherPlatform,
+        files: processedFiles
+      };
+
+      await onSubmit(requestData);
+      
+      // Reset form
+      setFormData({
+        platforms: [],
+        briefing: '',
+        deadline: '',
+        priority: 'normal',
+        otherPlatform: ''
+      });
+      setFiles([]);
+      
+    } catch (error) {
+      console.error('Error submitting request:', error);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-bold text-gray-900">🎬 Solicitar Novo Material</h2>
+            <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+              ✕
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Platforms */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                📱 Plataforma *
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                {platformOptions.map(platform => (
+                  <label key={platform.id} className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={formData.platforms.includes(platform.id)}
+                      onChange={(e) => handlePlatformChange(platform.id, e.target.checked)}
+                      className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                    />
+                    <span className="text-sm text-gray-700">{platform.label}</span>
+                  </label>
+                ))}
+              </div>
+              
+              {formData.platforms.includes('outros') && (
+                <div className="mt-3">
+                  <input
+                    type="text"
+                    placeholder="Especifique a plataforma"
+                    value={formData.otherPlatform}
+                    onChange={(e) => setFormData(prev => ({ ...prev, otherPlatform: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Briefing */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                📝 Briefing do Material *
+              </label>
+              <textarea
+                value={formData.briefing}
+                onChange={(e) => setFormData(prev => ({ ...prev, briefing: e.target.value }))}
+                rows={6}
+                placeholder="Descreva detalhadamente:
+• Objetivo do material
+• Público-alvo
+• Mensagem principal
+• Tom de voz desejado
+• Elementos visuais específicos
+• Prazo desejado"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              />
+              <div className="mt-1 text-xs text-gray-500">
+                {formData.briefing.length}/50 caracteres mínimos
+              </div>
+            </div>
+
+            {/* File Upload */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                📎 Anexar Referências (opcional)
+              </label>
+              <div
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={`border-2 border-dashed rounded-lg p-6 text-center ${
+                  dragOver ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
+                }`}
+              >
+                <div className="space-y-2">
+                  <div className="text-4xl">📁</div>
+                  <div className="text-sm text-gray-600">
+                    Drag & drop ou <button
+                      type="button"
+                      onClick={() => document.getElementById('file-input').click()}
+                      className="text-blue-600 hover:text-blue-800"
+                    >
+                      clique aqui
+                    </button>
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    Formatos: JPG, PNG, PDF, DOC<br />
+                    Máximo: 5 arquivos, 10MB cada
+                  </div>
+                </div>
+                <input
+                  id="file-input"
+                  type="file"
+                  multiple
+                  accept=".jpg,.jpeg,.png,.pdf,.doc,.docx"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+              </div>
+              
+              {files.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {files.map((file, index) => (
+                    <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                      <span className="text-sm text-gray-700">{file.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeFile(index)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Deadline */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                🗓️ Prazo Desejado *
+              </label>
+              <input
+                type="date"
+                value={formData.deadline}
+                onChange={(e) => setFormData(prev => ({ ...prev, deadline: e.target.value }))}
+                min={new Date().toISOString().split('T')[0]}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+
+            {/* Priority */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                ⚠️ Prioridade
+              </label>
+              <div className="flex space-x-4">
+                {[
+                  { value: 'baixa', label: 'Baixa' },
+                  { value: 'normal', label: 'Normal' },
+                  { value: 'urgente', label: 'Urgente' }
+                ].map(priority => (
+                  <label key={priority.value} className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      name="priority"
+                      value={priority.value}
+                      checked={formData.priority === priority.value}
+                      onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value }))}
+                      className="h-4 w-4 text-blue-600 border-gray-300"
+                    />
+                    <span className="text-sm text-gray-700">{priority.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Buttons */}
+            <div className="flex justify-end space-x-3 pt-4">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={uploading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+              >
+                {uploading ? 'Enviando...' : '📤 Enviar'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Documents Modal Component
+const DocumentsModal = ({ isOpen, onClose }) => {
+  const [documents, setDocuments] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchDocuments();
+    }
+  }, [isOpen]);
+
+  const fetchDocuments = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.get('/client/documents');
+      setDocuments(response.data);
+    } catch (error) {
+      console.error('Error fetching documents:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredDocuments = documents.filter(doc =>
+    doc.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const documentsByCategory = filteredDocuments.reduce((acc, doc) => {
+    if (!acc[doc.category]) {
+      acc[doc.category] = [];
+    }
+    acc[doc.category].push(doc);
+    return acc;
+  }, {});
+
+  const handleDownload = async (documentId, fileName) => {
+    try {
+      const response = await axios.get(`/client/documents/download/${documentId}`, {
+        responseType: 'blob'
+      });
+      const blob = new Blob([response.data]);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading document:', error);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-bold text-gray-900">📚 Biblioteca de Documentos</h2>
+            <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+              ✕
+            </button>
+          </div>
+
+          {/* Search */}
+          <div className="mb-6">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="🔍 Buscar documentos..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              />
+              <div className="absolute left-3 top-2.5 text-gray-400">🔍</div>
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+              <p className="mt-2 text-gray-600">Carregando documentos...</p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {Object.entries(documentsByCategory).map(([category, docs]) => (
+                <div key={category}>
+                  <h3 className="text-lg font-medium text-gray-900 mb-3">
+                    📂 {category}
+                  </h3>
+                  <div className="space-y-2">
+                    {docs.map(doc => (
+                      <div key={doc.id} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg hover:bg-gray-100">
+                        <div className="flex items-center space-x-3">
+                          <div className="text-2xl">
+                            {doc.type === 'pdf' ? '📄' : doc.type === 'doc' ? '🎬' : '🎨'}
+                          </div>
+                          <div>
+                            <div className="font-medium text-gray-900">{doc.name}</div>
+                            <div className="text-sm text-gray-500">
+                              {new Date(doc.created_at).toLocaleDateString()}
+                              {doc.is_new && <span className="ml-2 bg-red-100 text-red-800 text-xs px-2 py-1 rounded">Novo</span>}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleDownload(doc.id, doc.name)}
+                          className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                        >
+                          📥 Download
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              
+              {Object.keys(documentsByCategory).length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  {searchTerm ? 'Nenhum documento encontrado' : 'Nenhum documento disponível'}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="flex justify-end mt-6">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Support Modal Component
+const SupportModal = ({ isOpen, onClose, onSubmit }) => {
+  const [formData, setFormData] = useState({
+    subject: '',
+    message: '',
+    priority: 'normal',
+    responseChannels: ['email']
+  });
+  const [files, setFiles] = useState([]);
+
+  const subjectOptions = [
+    { value: 'material', label: '🎬 Dúvida sobre Material' },
+    { value: 'campaign', label: '📊 Questão sobre Campanha' },
+    { value: 'deadline', label: '📅 Alteração de Prazo' },
+    { value: 'financial', label: '💰 Questão Financeira' },
+    { value: 'technical', label: '🔧 Problema Técnico' },
+    { value: 'feedback', label: '💡 Sugestão/Feedback' },
+    { value: 'urgent', label: '🆘 Urgente' },
+    { value: 'meeting', label: '📞 Solicitar Reunião' },
+    { value: 'other', label: '📝 Outros' }
+  ];
+
+  const handleFileUpload = (event) => {
+    const newFiles = Array.from(event.target.files);
+    if (files.length + newFiles.length > 3) {
+      alert('Máximo de 3 arquivos permitido');
+      return;
+    }
+    
+    const validFiles = newFiles.filter(file => {
+      const maxSize = 5 * 1024 * 1024; // 5MB
+      
+      if (file.size > maxSize) {
+        alert(`Arquivo ${file.name} é muito grande (máximo 5MB)`);
+        return false;
+      }
+      
+      return true;
+    });
+    
+    setFiles(prev => [...prev, ...validFiles]);
+  };
+
+  const removeFile = (index) => {
+    setFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleChannelChange = (channel, checked) => {
+    if (checked) {
+      setFormData(prev => ({
+        ...prev,
+        responseChannels: [...prev.responseChannels, channel]
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        responseChannels: prev.responseChannels.filter(c => c !== channel)
+      }));
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!formData.subject) {
+      alert('Selecione um assunto');
+      return;
+    }
+    
+    if (formData.message.length < 20) {
+      alert('Mensagem deve ter pelo menos 20 caracteres');
+      return;
+    }
+
+    try {
+      // Process files to base64
+      const processedFiles = await Promise.all(
+        files.map(async (file) => {
+          return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              resolve({
+                name: file.name,
+                type: file.type,
+                size: file.size,
+                data: e.target.result
+              });
+            };
+            reader.readAsDataURL(file);
+          });
+        })
+      );
+
+      const supportData = {
+        subject: formData.subject,
+        message: formData.message,
+        priority: formData.priority,
+        responseChannels: formData.responseChannels,
+        files: processedFiles
+      };
+
+      await onSubmit(supportData);
+      
+      // Reset form
+      setFormData({
+        subject: '',
+        message: '',
+        priority: 'normal',
+        responseChannels: ['email']
+      });
+      setFiles([]);
+      
+    } catch (error) {
+      console.error('Error submitting support request:', error);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-bold text-gray-900">💬 Suporte Take 2 Studio</h2>
+            <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+              ✕
+            </button>
+          </div>
+
+          <div className="mb-4 text-sm text-gray-600">
+            👋 Olá! Como podemos ajudar?
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Subject */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                📞 Assunto da Mensagem *
+              </label>
+              <select
+                value={formData.subject}
+                onChange={(e) => setFormData(prev => ({ ...prev, subject: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">▼ Selecione o tipo</option>
+                {subjectOptions.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Message */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                💬 Sua Mensagem *
+              </label>
+              <textarea
+                value={formData.message}
+                onChange={(e) => setFormData(prev => ({ ...prev, message: e.target.value }))}
+                rows={5}
+                placeholder="Descreva sua dúvida ou solicitação de forma detalhada..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              />
+              <div className="mt-1 text-xs text-gray-500">
+                {formData.message.length}/20 caracteres mínimos
+              </div>
+            </div>
+
+            {/* File Upload */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                📎 Anexar Arquivo (opcional)
+              </label>
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+                <div className="space-y-2">
+                  <div className="text-2xl">📁</div>
+                  <div className="text-sm text-gray-600">
+                    <button
+                      type="button"
+                      onClick={() => document.getElementById('support-file-input').click()}
+                      className="text-blue-600 hover:text-blue-800"
+                    >
+                      Clique para anexar
+                    </button>
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    Máximo: 3 arquivos, 5MB cada
+                  </div>
+                </div>
+                <input
+                  id="support-file-input"
+                  type="file"
+                  multiple
+                  accept="*"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+              </div>
+              
+              {files.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {files.map((file, index) => (
+                    <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                      <span className="text-sm text-gray-700">{file.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeFile(index)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Priority */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                ⚡ Prioridade
+              </label>
+              <div className="flex space-x-4">
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    name="priority"
+                    value="normal"
+                    checked={formData.priority === 'normal'}
+                    onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value }))}
+                    className="h-4 w-4 text-blue-600 border-gray-300"
+                  />
+                  <span className="text-sm text-gray-700">Normal</span>
+                </label>
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    name="priority"
+                    value="urgente"
+                    checked={formData.priority === 'urgente'}
+                    onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value }))}
+                    className="h-4 w-4 text-blue-600 border-gray-300"
+                  />
+                  <span className="text-sm text-gray-700">Urgente</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Response Channels */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                📧 Resposta por:
+              </label>
+              <div className="flex space-x-4">
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={formData.responseChannels.includes('email')}
+                    onChange={(e) => handleChannelChange('email', e.target.checked)}
+                    className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                  />
+                  <span className="text-sm text-gray-700">Email</span>
+                </label>
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={formData.responseChannels.includes('whatsapp')}
+                    onChange={(e) => handleChannelChange('whatsapp', e.target.checked)}
+                    className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                  />
+                  <span className="text-sm text-gray-700">WhatsApp</span>
+                </label>
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={formData.responseChannels.includes('telefone')}
+                    onChange={(e) => handleChannelChange('telefone', e.target.checked)}
+                    className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                  />
+                  <span className="text-sm text-gray-700">Telefone</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Buttons */}
+            <div className="flex justify-end space-x-3 pt-4">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
+                📤 Enviar
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // =================== MAIN APP ===================
 
 const App = () => {
