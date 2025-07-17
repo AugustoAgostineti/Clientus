@@ -293,6 +293,75 @@ class DashboardStats(BaseModel):
     active_campaigns: int
     total_documents: int
 
+# Material Request Models
+class MaterialRequest(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    client_id: str
+    platforms: List[str]
+    briefing: str
+    deadline: datetime
+    priority: str = "normal"  # normal, urgent, low
+    other_platform: Optional[str] = None
+    files: List[dict] = []  # Store file data as dicts
+    status: str = "pending"  # pending, in_progress, completed, cancelled
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+class MaterialRequestCreate(BaseModel):
+    platforms: List[str]
+    briefing: str
+    deadline: str
+    priority: str = "normal"
+    other_platform: Optional[str] = None
+    files: List[dict] = []
+
+class MaterialRequestResponse(BaseModel):
+    id: str
+    client_id: str
+    client_name: Optional[str] = None
+    platforms: List[str]
+    briefing: str
+    deadline: datetime
+    priority: str
+    other_platform: Optional[str] = None
+    files: List[dict]
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+# Support Ticket Models
+class SupportTicket(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    client_id: str
+    subject: str
+    message: str
+    priority: str = "normal"  # normal, urgent
+    response_channels: List[str] = ["email"]
+    files: List[dict] = []
+    status: str = "open"  # open, in_progress, resolved, closed
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+class SupportTicketCreate(BaseModel):
+    subject: str
+    message: str
+    priority: str = "normal"
+    response_channels: List[str] = ["email"]
+    files: List[dict] = []
+
+class SupportTicketResponse(BaseModel):
+    id: str
+    client_id: str
+    client_name: Optional[str] = None
+    subject: str
+    message: str
+    priority: str
+    response_channels: List[str]
+    files: List[dict]
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
 class RecentActivity(BaseModel):
     id: str
     type: str  # "material_uploaded", "approval_requested", "campaign_updated"
