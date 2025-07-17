@@ -3351,6 +3351,42 @@ const ClientApp = () => {
           </div>
         </div>
 
+        {/* Quick Actions */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-8">
+          <div className="p-6 border-b border-gray-200">
+            <h3 className="text-lg font-medium text-gray-900">Quick Actions</h3>
+            <p className="mt-1 text-sm text-gray-600">Manage your projects and communications</p>
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <button
+                onClick={() => setShowRequestMaterialModal(true)}
+                className="bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg p-4 text-left transition-colors"
+              >
+                <div className="text-2xl mb-2">📝</div>
+                <div className="text-sm font-medium text-blue-900">Request Material</div>
+                <div className="text-xs text-blue-700 mt-1">Solicitar novo material para suas campanhas</div>
+              </button>
+              <button
+                onClick={() => setShowDocumentsModal(true)}
+                className="bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg p-4 text-left transition-colors"
+              >
+                <div className="text-2xl mb-2">📁</div>
+                <div className="text-sm font-medium text-green-900">View Documents</div>
+                <div className="text-xs text-green-700 mt-1">Acessar biblioteca de documentos</div>
+              </button>
+              <button
+                onClick={() => setShowSupportModal(true)}
+                className="bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-lg p-4 text-left transition-colors"
+              >
+                <div className="text-2xl mb-2">💬</div>
+                <div className="text-sm font-medium text-purple-900">Support</div>
+                <div className="text-xs text-purple-700 mt-1">Entrar em contato com nossa equipe</div>
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* Recent Materials */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
           <div className="p-6 border-b border-gray-200">
