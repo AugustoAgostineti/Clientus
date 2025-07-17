@@ -4,7 +4,7 @@ import json
 from datetime import datetime
 
 class Take2StudioAPITester:
-    def __init__(self, base_url="https://66185665-d1f9-4677-b8b5-9e9ea57ab2cb.preview.emergentagent.com"):
+    def __init__(self, base_url="https://4302e0d1-9d6e-4258-841c-e284bd51856b.preview.emergentagent.com"):
         self.base_url = f"{base_url}/api"
         self.token = None
         self.tests_run = 0

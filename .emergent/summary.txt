@@ -1,0 +1,101 @@
+<analysis>
+The previous AI engineer successfully developed the Take 2 Studio client portal from scratch, progressing through several iterations. Initially, a Minimum Viable Product (MVP) was built, encompassing JWT authentication, a basic client dashboard with a materials timeline, and campaign metrics, with data pre-populated for immediate demonstration. Following this, Iteration 2 was completed, introducing an interactive calendar, a detailed material preview system with approval and commenting functionalities, and a comprehensive document library for clients. A significant challenge during Iteration 2 involved debugging a client ID mismatch during document seeding, which was resolved by ensuring consistent client IDs.
+
+The project then shifted to building an extensive administrative dashboard. This involved implementing a dual authentication system (client and admin), a dashboard overview with key statistics, and a full material management system including upload, detailed cards, filters, and bulk actions. A persistent issue during both client and admin UI development was recurring frontend parsing errors, specifically return outside function, requiring debugging after bulk file writes. Currently, the engineer is in the process of implementing the complete campaign management section of the admin dashboard, focusing on new modals for campaign creation and details, and is actively debugging a similar frontend parsing error.
+</analysis>
+
+<product_requirements>
+The goal is to create an exclusive web portal for Take 2 Studio clients to track digital marketing and content production progress, emphasizing professionalism, creativity, and transparency.
+
+**Core Features:**
+*   **Authentication:** Individual client login (email/password), personalized dashboard, secure logout.
+*   **Timeline/Calendar:** Monthly calendar view of materials (photos, videos, carousels, stories) with thumbnails, captions, status (planned, in production, approved, published), and delivery dates. Filters by material type and a list view option.
+*   **Document Library:** Strategic Documents section for brand positioning, video scripts, campaign briefings, visual guidelines. Supports PDF download/inline viewing, organized by categories.
+*   **Campaign Dashboard:** Cards for active campaigns showing customizable metrics (impressions, clicks, CTR, ROAS, conversions, leads) with simple graphs and period comparison.
+
+**Admin Dashboard (New):**
+*   **Dual Authentication:** Separate login for clients and administrators (), with role-based permissions (Admin, Editor, Viewer).
+*   **Overview:** Stats cards (active clients, pending materials/approvals, active campaigns), recent activity, quick actions.
+*   **Client Management:** List/grid of clients with status, project details, and actions (view portal, edit, report). Form for new client creation with customizable visible metrics.
+*   **Material Management:** Upload/organize materials with filters (client, status, type, date, search), detailed cards with actions (preview, edit, approve, delete), and bulk actions. Comprehensive upload modal with drag & drop.
+*   **Campaign Management:** Dashboard with detailed campaign cards (metrics, budget, status), new campaign creation modal, and detailed view with performance graphs. Includes OAuth integration with Meta Business API for real-time data.
+*   **Document Management:** Upload/organize documents by client, with categories, search, and visibility toggles.
+*   **Unified Calendar:** A consolidated calendar view showing materials from all clients.
+*   **UX Enhancements:** Notifications for approvals/revisions, deadline alerts, budget alerts, auto-reports, and mass actions.
+</product_requirements>
+
+<key_technical_concepts>
+-   **Full-Stack Development**: FastAPI for the backend (Python), React for the frontend (TypeScript).
+-   **Database**: MongoDB for data storage and management.
+-   **Authentication**: JWT (JSON Web Tokens) for secure client and administrative login, enhanced with password hashing (bcrypt).
+-   **Styling**: Tailwind CSS for responsive and modern UI design.
+-   **State Management**: React Context API for application state.
+-   **API Integration**: Plans for OAuth with Meta Business API for real-time campaign data.
+-   **Data Identification**: Uses UUIDs for document IDs to ensure JSON serializability.
+</key_technical_concepts>
+
+<code_architecture>
+The application follows a standard full-stack structure with distinct backend and frontend directories.
+
+
+
+**Detailed Directory Structure:**
+
+*   **/app/backend/**:
+    *   : Lists Python dependencies (e.g., , , , , , ).
+    *   : This is the core FastAPI application file.
+        *   **Importance**: Handles all backend logic, including API routes, database interactions (MongoDB), JWT authentication, password hashing, and data seeding. It defines models for , , , , and .
+        *   **Changes Made**:
+            *   Initially set up for MVP with basic auth, dashboard, and materials.
+            *   Extended for Iteration 2: added endpoints for material preview, approval/comments, and document management.
+            *   Significantly expanded for Admin Dashboard: introduced dual authentication routes (), new endpoints for , , , , and admin dashboard stats.
+            *   Includes comprehensive data seeding logic to populate demo clients, materials, campaigns, documents, and admin users, with corrections made to client ID assignment for documents.
+            *   Latest changes include adding endpoints for detailed campaign management, including metrics and potential integration points.
+    *   : Stores environment variables like .
+
+*   **/app/frontend/**:
+    *   : Manages Node.js dependencies (e.g., , , , , , ).
+    *   : Configuration for Tailwind CSS.
+    *   : PostCSS configuration.
+    *   : Stores environment variables like .
+    *   : Contains static assets.
+    *   : Contains React source code.
+        *   : The application's entry point, rendering the main  component.
+        *   : The main React component.
+            *   **Importance**: Contains the entire frontend application UI, routing logic for both client and admin portals, state management (using React Context), and API calls to the backend. It dynamically renders different sections (Dashboard, Calendar, Documents, Campaigns, Admin panels) based on authentication status and user roles.
+            *   **Changes Made**:
+                *   Initially set up for MVP with login, basic dashboard, materials timeline, and campaign display.
+                *   Extended for Iteration 2: implemented interactive calendar, material preview modals, approval/comment sections, and the document library UI.
+                *   Significantly expanded for Admin Dashboard: introduced separate routing for admin paths, implemented the admin sidebar, client management UI (list, create modal), materials management UI (list, upload modal, preview/edit modal, filters, bulk actions).
+                *   Currently undergoing changes for Admin Campaign Management, including new modals for creating and viewing campaign details.
+                *   Frequent debugging required to fix syntax errors (e.g.,  outside function) after bulk writes.
+        *   : Contains global and component-specific styles, likely utilizing Tailwind directives.
+        *   : Global CSS styles.
+
+The codebase utilizes  for large-scale initial development and major updates, followed by  for smaller, targeted fixes and refinements.
+</code_architecture>
+
+<pending_tasks>
+-   Full implementation of Campaign Management, including Meta Business API OAuth integration and Google Ads API.
+-   Implementation of the Admin Document Management section (upload, organization by client).
+-   Development of the Admin Unified Calendar.
+-   Integration of Admin Notifications and Automatic Reports.
+-   Further advanced features like Agendar Lote (batch scheduling) for materials.
+</pending_tasks>
+
+<current_work>
+The immediate work is focused on implementing the Fase 3 - Gestão Completa de Campanhas e Métricas within the administrative dashboard. This involves significant updates to both the backend and frontend.
+
+On the **backend ()**, new endpoints have been integrated to support the comprehensive campaign management system. These endpoints facilitate the creation, retrieval, updating, and deletion (CRUD) of campaign data, as well as handling campaign-specific metrics. The goal is to provide robust API support for the detailed campaign cards and modals in the frontend.
+
+On the **frontend ()**, the AI engineer is actively building the user interface for campaign management. This includes:
+1.  **Main Interface**: Displaying detailed campaign cards with key metrics and status indicators.
+2.  **New Campaign Modal**: A form for creating new campaigns, allowing administrators to input campaign details such as name, objective, platforms, budget, dates, and metrics visible to clients.
+3.  **Campaign Details Modal**: A modal to view comprehensive details of a specific campaign, including performance graphs and historical changes.
+
+The work is currently at a critical juncture: the AI engineer has just written the frontend code for these new campaign modals. However, a parsing error (return outside function) has occurred in , likely introduced during the recent bulk write operation for the new modal components. The previous AI engineer was in the process of debugging and correcting this syntax error to ensure the new campaign management UI renders correctly and functions as intended.
+</current_work>
+
+<optional_next_step>
+Identify and fix the parsing error in  preventing the campaign modals from rendering correctly.
+</optional_next_step>
