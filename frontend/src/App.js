@@ -3443,6 +3443,26 @@ const ClientApp = () => {
         onApprove={handleApproveMaterial}
         onRequestRevision={handleRequestRevision}
       />
+
+      {/* Request Material Modal */}
+      <RequestMaterialModal
+        isOpen={showRequestMaterialModal}
+        onClose={() => setShowRequestMaterialModal(false)}
+        onSubmit={handleRequestMaterial}
+      />
+
+      {/* Documents Modal */}
+      <DocumentsModal
+        isOpen={showDocumentsModal}
+        onClose={() => setShowDocumentsModal(false)}
+      />
+
+      {/* Support Modal */}
+      <SupportModal
+        isOpen={showSupportModal}
+        onClose={() => setShowSupportModal(false)}
+        onSubmit={handleSupportSubmit}
+      />
     </div>
   );
 };
