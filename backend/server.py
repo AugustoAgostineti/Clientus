@@ -282,6 +282,7 @@ class DocumentResponse(BaseModel):
     description: Optional[str] = None
     visible_to_client: bool
     upload_date: datetime
+    is_new: Optional[bool] = False
 
 # Dashboard Stats
 class DashboardStats(BaseModel):
