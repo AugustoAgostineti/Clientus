@@ -1682,6 +1682,93 @@ async def seed_demo_data():
         if not existing_doc:
             await db.documents.insert_one(doc.dict())
     
+    # Create demo material requests
+    demo_material_requests = [
+        MaterialRequest(
+            id="request_001",
+            client_id=demo_client.id,
+            platforms=["instagram_feed", "instagram_stories"],
+            briefing="Preciso de conteúdo para divulgar nosso novo produto. O público-alvo são jovens adultos de 25-35 anos interessados em tecnologia. A mensagem deve ser inovadora e moderna, com tom descontraído mas profissional. Elementos visuais devem incluir cores vibrantes e tipografia moderna.",
+            deadline=datetime(2025, 1, 25, 0, 0, 0),
+            priority="normal",
+            files=[
+                {"name": "referencia_produto.jpg", "type": "image/jpeg", "size": 1024000, "data": "data:image/jpeg;base64,/9j/4AAQ..."},
+                {"name": "brief_campanha.pdf", "type": "application/pdf", "size": 2048000, "data": "data:application/pdf;base64,JVBERi0xLjQ..."}
+            ],
+            status="pending"
+        ),
+        MaterialRequest(
+            id="request_002",
+            client_id=demo_client.id,
+            platforms=["facebook_post", "linkedin"],
+            briefing="Campanha de lançamento para nosso novo serviço B2B. Público executivo, mensagem deve ser séria e confiável. Preciso de materiais que transmitam expertise e profissionalismo. Tom corporativo mas acessível.",
+            deadline=datetime(2025, 1, 30, 0, 0, 0),
+            priority="urgent",
+            files=[],
+            status="in_progress"
+        ),
+        MaterialRequest(
+            id="request_003",
+            client_id=demo_client.id,
+            platforms=["instagram_reels", "tiktok"],
+            briefing="Conteúdo viral para engajar nossa audiência jovem. Deve ser divertido, atual e relacionado com trends do momento. Tom descontraído e bem humorado. Elementos visuais dinâmicos e coloridos.",
+            deadline=datetime(2025, 2, 5, 0, 0, 0),
+            priority="normal",
+            files=[
+                {"name": "trend_reference.mp4", "type": "video/mp4", "size": 5120000, "data": "data:video/mp4;base64,AAAAIGZ0eXA..."}
+            ],
+            status="completed"
+        )
+    ]
+    
+    # Insert demo material requests
+    for request in demo_material_requests:
+        existing_request = await db.material_requests.find_one({"id": request.id})
+        if not existing_request:
+            await db.material_requests.insert_one(request.dict())
+    
+    # Create demo support tickets
+    demo_support_tickets = [
+        SupportTicket(
+            id="ticket_001",
+            client_id=demo_client.id,
+            subject="material",
+            message="Gostaria de saber sobre o status do material que solicitei na semana passada. Preciso de uma previsão de entrega para poder planejar nossa campanha.",
+            priority="normal",
+            response_channels=["email", "whatsapp"],
+            files=[],
+            status="resolved"
+        ),
+        SupportTicket(
+            id="ticket_002",
+            client_id=demo_client.id,
+            subject="deadline",
+            message="Preciso alterar o prazo da campanha de Black Friday. Surgiu uma oportunidade de antecipar o lançamento e gostaria de ajustar o cronograma se possível.",
+            priority="urgent",
+            response_channels=["email"],
+            files=[
+                {"name": "novo_cronograma.xlsx", "type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "size": 512000, "data": "data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,UEsDBBQ..."}
+            ],
+            status="in_progress"
+        ),
+        SupportTicket(
+            id="ticket_003",
+            client_id=demo_client.id,
+            subject="feedback",
+            message="Quero parabenizar a equipe pelo excelente trabalho na última campanha. Os resultados superaram nossas expectativas e gostaríamos de discutir uma expansão do projeto.",
+            priority="normal",
+            response_channels=["email", "telefone"],
+            files=[],
+            status="open"
+        )
+    ]
+    
+    # Insert demo support tickets
+    for ticket in demo_support_tickets:
+        existing_ticket = await db.support_tickets.find_one({"id": ticket.id})
+        if not existing_ticket:
+            await db.support_tickets.insert_one(ticket.dict())
+    
     return {"message": "Demo data seeded successfully"}
 
 # Include the router in the main app
