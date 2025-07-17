@@ -1903,6 +1903,9 @@ const CampaignDetailsModal = ({ campaign, onClose }) => {
     </div>
   );
 };
+
+// Create Client Modal Component
+const CreateClientModal = ({ onClose, onSubmit }) => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
